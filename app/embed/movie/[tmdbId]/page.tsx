@@ -87,7 +87,7 @@ export default function MovieEmbedPage() {
   }
 
   return (
-    <main className="w-full h-full bg-cover bg-center text-white flex items-center justify-center p-4" style={backgroundStyle}>
+    <main className="w-full h-full bg-cover bg-center text-white flex items-start justify-center p-4 pt-12 md:pt-24" style={backgroundStyle}>
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
       <div className="relative z-10 w-full max-w-lg text-center">
         <h1 className="text-2xl font-bold mb-2">{movie?.title}</h1>
