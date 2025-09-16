@@ -11,7 +11,11 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      {showHeader && <Header />}
+      {showHeader && (
+        <Suspense fallback={null}>
+          <Header />
+        </Suspense>
+      )}
       {children}
     </>
   )
