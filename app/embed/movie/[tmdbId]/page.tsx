@@ -54,10 +54,6 @@ export default function MovieEmbedPage() {
     fetchMovieData();
   }, [tmdbId]);
 
-  const handlePlay = (stream: Stream) => {
-    setSelectedStream(stream);
-  };
-
   const getProxyVideoUrl = (stream: Stream) => {
     const p = new URLSearchParams();
     p.append("videoUrl", stream.url);
@@ -70,39 +66,40 @@ export default function MovieEmbedPage() {
   const backgroundStyle = movie?.backdrop_path ? { backgroundImage: `url(https://image.tmdb.org/t/p/original/${movie.backdrop_path})` } : {};
 
   if (loading) {
-    return <div className="bg-black w-screen h-screen flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-white" /></div>;
+    return <main className="w-full h-full flex items-center justify-center bg-black"><Loader2 className="w-12 h-12 animate-spin text-white" /></main>;
   }
   
   if (error) {
-    return <div className="bg-black w-screen h-screen flex items-center justify-center p-4"><p className="text-red-500 text-center font-bold text-lg max-w-md">{error}</p></div>;
+    return <main className="w-full h-full flex items-center justify-center bg-black p-4"><p className="text-red-500 text-center font-bold text-lg max-w-md">{error}</p></main>;
   }
   
   if (selectedStream) {
     return (
-      <VideoPlayer 
-        src={getProxyVideoUrl(selectedStream)} 
-        title={movie?.title || 'Player'}
-        // A função do botão "Mais Opções" para filmes é voltar para a seleção
-        onShowOptions={() => setSelectedStream(null)}
-        mediaType="movie" // Informando ao player que é um filme
-      />
+      <main className="w-full h-full flex items-center justify-center bg-black">
+        <VideoPlayer 
+          src={getProxyVideoUrl(selectedStream)} 
+          title={movie?.title || 'Player'}
+          onShowOptions={() => setSelectedStream(null)}
+          mediaType="movie"
+        />
+      </main>
     );
   }
 
   return (
-    <div className="w-screen h-screen bg-black bg-cover bg-center text-white flex items-center justify-center p-4" style={backgroundStyle}>
+    <main className="w-full h-full bg-cover bg-center text-white flex items-center justify-center p-4" style={backgroundStyle}>
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
       <div className="relative z-10 w-full max-w-lg text-center">
         <h1 className="text-2xl font-bold mb-2">{movie?.title}</h1>
         <p className="text-zinc-400 mb-6">Selecione um servidor Dublado</p>
         <div className="mt-4 space-y-2">
             {streams.map((stream, index) => (
-              <Button key={index} onClick={() => handlePlay(stream)} className="w-full h-12 bg-zinc-800/60 hover:bg-zinc-700/80 text-white font-semibold flex items-center justify-center gap-2">
+              <Button key={index} onClick={() => setSelectedStream(stream)} className="w-full h-12 bg-zinc-800/60 hover:bg-zinc-700/80 text-white font-semibold flex items-center justify-center gap-2">
                 <Tv className="w-5 h-5" /> {stream.name || 'Servidor'}
               </Button>
             ))}
         </div>
       </div>
-    </div>
+    </main>
   );
 }

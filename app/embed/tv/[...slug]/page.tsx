@@ -33,12 +33,8 @@ export default function TvEmbedPage() {
   const [selectedSeason, setSelectedSeason] = useState<string>(seasonNumber || "1");
 
   const [streams, setStreams] = useState<Stream[]>([]);
-  const [selectedStream, setSelectedStream] = useState<Stream | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
-  // Decide se mostra a seleção de servidor ou vai direto pro player
   const [currentEpisodeDetails, setCurrentEpisodeDetails] = useState<Episode | null>(null);
-
 
   useEffect(() => {
     if (!tmdbId) return;
@@ -66,12 +62,12 @@ export default function TvEmbedPage() {
             const currentEp = seasonData.episodes?.find((e: Episode) => e.episode_number == parseInt(episodeNumber));
             setCurrentEpisodeDetails(currentEp);
 
-            // Se encontrou streams, vai para o player
             setView('playing');
 
         } else {
-          // Se faltar S/E, vai para a seleção de episódios
-          const seasonRes = await fetch(`${API_BASE_URL}/tv/${tmdbId}/season/1?api_key=${API_KEY}&language=pt-BR`);
+          const firstSeason = detailsData.seasons.find((s: Season) => s.season_number > 0)?.season_number || 1;
+          setSelectedSeason(String(firstSeason));
+          const seasonRes = await fetch(`${API_BASE_URL}/tv/${tmdbId}/season/${firstSeason}?api_key=${API_KEY}&language=pt-BR`);
           const seasonData = await seasonRes.json();
           setEpisodes(seasonData.episodes || []);
           setView('episode-selection');
@@ -87,35 +83,36 @@ export default function TvEmbedPage() {
   const backgroundStyle = tvDetails?.backdrop_path ? { backgroundImage: `url(https://image.tmdb.org/t/p/original/${tvDetails.backdrop_path})` } : {};
 
   if (view === 'loading') {
-    return <div className="bg-black w-screen h-screen flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-white" /></div>;
+    return <main className="w-full h-full flex items-center justify-center bg-black"><Loader2 className="w-12 h-12 animate-spin text-white" /></main>;
   }
   
   if (error) {
-    return <div className="bg-black w-screen h-screen flex items-center justify-center p-4"><p className="text-red-500 text-center font-bold text-lg max-w-md">{error}</p></div>;
+    return <main className="w-full h-full flex items-center justify-center bg-black p-4"><p className="text-red-500 text-center font-bold text-lg max-w-md">{error}</p></main>;
   }
   
   if (view === 'playing' && streams.length > 0) {
-    const streamToPlay = streams[0]; // Pega o primeiro servidor por padrão
+    const streamToPlay = streams[0];
     const proxyUrl = `/api/video-proxy?videoUrl=${encodeURIComponent(streamToPlay.url)}&headers=${encodeURIComponent(JSON.stringify(streamToPlay.proxyHeaders?.request || {}))}`;
     
     return (
-      <VideoPlayer 
-        src={proxyUrl}
-        title={`${tvDetails?.name || 'Player'} - S${seasonNumber}E${episodeNumber}`}
-        mediaType="tv"
-        tmdbId={tmdbId}
-        seasons={tvDetails?.seasons}
-        initialEpisodes={episodes}
-        currentSeason={parseInt(seasonNumber || '1')}
-        currentEpisode={parseInt(episodeNumber || '1')}
-      />
+      <main className="w-full h-full flex items-center justify-center bg-black">
+        <VideoPlayer 
+          src={proxyUrl}
+          title={`${tvDetails?.name || 'Player'} - S${seasonNumber}E${episodeNumber}`}
+          mediaType="tv"
+          tmdbId={tmdbId}
+          seasons={tvDetails?.seasons}
+          initialEpisodes={episodes}
+          currentSeason={parseInt(seasonNumber || '1')}
+          currentEpisode={parseInt(episodeNumber || '1')}
+        />
+      </main>
     );
   }
 
-  // Tela de seleção de episódio (Fallback)
   if (view === 'episode-selection') {
     return (
-      <div className="w-screen h-screen bg-black bg-cover bg-center text-white flex" style={backgroundStyle}>
+      <main className="w-full h-full bg-cover bg-center text-white flex" style={backgroundStyle}>
         <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
         <div className="relative z-10 w-full max-w-sm bg-zinc-900/70 h-full flex flex-col">
             <div className="p-4 border-b border-zinc-800">
@@ -146,9 +143,9 @@ export default function TvEmbedPage() {
             </ScrollArea>
         </div>
         <div className="flex-1 hidden md:block"></div>
-      </div>
+      </main>
     );
   }
 
-  return <div className="bg-black w-screen h-screen flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-white" /></div>;
+  return <main className="w-full h-full flex items-center justify-center bg-black"><Loader2 className="w-12 h-12 animate-spin text-white" /></main>;
 }
