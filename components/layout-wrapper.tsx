@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation"
 import { Header } from "@/components/Header"
+import { Suspense } from 'react'
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
