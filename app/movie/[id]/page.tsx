@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { Star, Calendar, Clock, PlayCircle, Clapperboard, Heart } from 'lucide-react'
-import NewVideoPlayer from '@/components/NewVideoPlayer'
+import VideoPlayer from '@/components/video-player' // Revertido
 import { Button } from "@/components/ui/button"
 import { useFavorites, type FavoriteItem } from "@/components/favorites-context"
 import { cn } from "@/lib/utils"
@@ -66,6 +66,8 @@ function MovieDetailInner({ id }: { id: string }) {
 
   const favData: FavoriteItem = { id: movie.id, media_type: "movie", title: movie.title, poster_path: movie.poster_path, backdrop_path: movie.backdrop_path, release_date: movie.release_date, };
   const fav = isFavorite(movie.id, "movie");
+  const { buttonVariants } = require("@/components/ui/button");
+
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-50">
@@ -112,11 +114,12 @@ function MovieDetailInner({ id }: { id: string }) {
       {selectedStream && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4">
           <div className="w-full max-w-6xl">
-              <NewVideoPlayer 
+              <VideoPlayer 
                   src={getProxyVideoUrl(selectedStream)} 
                   title={`${movie.title} - ${selectedStream.description}`} 
-                  onClose={() => setSelectedStream(null)} 
                   onShowOptions={() => setSelectedStream(null)}
+                  mediaType="movie"
+                  tmdbId={id}
               />
           </div>
         </motion.div>
@@ -128,3 +131,4 @@ function MovieDetailInner({ id }: { id: string }) {
 export default function MovieDetailPage({ params }: { params: { id: string } }) {
     return <MovieDetailInner id={params.id} />
 }
+

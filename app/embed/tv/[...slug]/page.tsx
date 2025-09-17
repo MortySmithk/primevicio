@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import NewVideoPlayer from '@/components/NewVideoPlayer';
+import VideoPlayer from '@/components/video-player'; // Revertido
 import { Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -88,10 +88,15 @@ export default function TvEmbedPage() {
     
     return (
       <main className="w-full h-full flex items-center justify-center bg-black">
-        <NewVideoPlayer 
+        <VideoPlayer 
           src={proxyUrl}
           title={`${tvDetails?.name || 'Player'} - S${seasonNumber}E${episodeNumber}`}
           onShowOptions={() => router.push(`/embed/tv/${tmdbId}/${seasonNumber}`)}
+          mediaType="tv"
+          tmdbId={tmdbId}
+          seasons={tvDetails?.seasons}
+          currentSeason={Number(seasonNumber)}
+          currentEpisode={Number(episodeNumber)}
         />
       </main>
     );
@@ -136,3 +141,4 @@ export default function TvEmbedPage() {
 
   return <main className="w-full h-full flex items-center justify-center bg-black"><Loader2 className="w-12 h-12 animate-spin text-white" /></main>;
 }
+

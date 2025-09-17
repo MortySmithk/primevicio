@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Star, Calendar, PlayCircle, ChevronDown, Loader2, Tv, Heart } from 'lucide-react'
-import NewVideoPlayer from '@/components/NewVideoPlayer'
+import VideoPlayer from '@/components/video-player' // Revertido
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { useFavorites, type FavoriteItem } from "@/components/favorites-context"
@@ -105,10 +105,15 @@ function TVDetailInner({ id }: { id: string }) {
       {activeEpisode && streamToPlay && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4">
           <div className="w-full max-w-6xl">
-            <NewVideoPlayer 
+            <VideoPlayer 
               src={getProxyVideoUrl(streamToPlay)} 
               title={`${tv.name} - S${selectedSeason}E${activeEpisode.episode_number}`} 
-              onClose={() => setActiveEpisode(null)}
+              onShowOptions={() => setActiveEpisode(null)}
+              mediaType="tv"
+              tmdbId={id}
+              seasons={tv.seasons}
+              currentSeason={selectedSeason}
+              currentEpisode={activeEpisode.episode_number}
             />
           </div>
         </motion.div>
@@ -182,3 +187,4 @@ function TVDetailInner({ id }: { id: string }) {
 export default function TVDetailPage({ params }: { params: { id: string } }) {
     return <TVDetailInner id={params.id} />;
 }
+
