@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Play, Pause, Maximize, Minimize, Rewind, FastForward, Loader2, ChevronsRight, ChevronsLeft
+  Play, Pause, Maximize, Minimize, Rewind, FastForward, Loader2, ChevronsRight, ChevronsLeft, Download
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -271,6 +271,12 @@ export default function VideoPlayer({
     if (thumbnailDebounceRef.current) clearTimeout(thumbnailDebounceRef.current);
     setThumbnail(null);
   };
+  
+  const handleDownload = () => {
+    const params = new URL(src).searchParams.toString();
+    const downloadPageUrl = `/download?${params}`;
+    window.open(downloadPageUrl, '_blank');
+  };
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -418,6 +424,7 @@ export default function VideoPlayer({
                     <span className="text-xs font-mono">{formatTime(currentTime)} / {formatTime(duration)}</span>
                   </div>
                   <div className="flex items-center gap-1 md:gap-2">
+                    <Tooltip><TooltipTrigger asChild><Button onClick={handleDownload} size="icon" variant="ghost" className="text-yellow-400"><Download /></Button></TooltipTrigger><TooltipContent>Baixar</TooltipContent></Tooltip>
                     <Tooltip><TooltipTrigger asChild><Button onClick={toggleFullscreen} size="icon" variant="ghost">{isFullscreen ? <Minimize /> : <Maximize />}</Button></TooltipTrigger><TooltipContent>Tela Cheia (f)</TooltipContent></Tooltip>
                   </div>
                 </div>
