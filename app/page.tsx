@@ -10,7 +10,7 @@ import { useFavorites, type FavoriteItem } from "@/components/favorites-context"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import PaginationComponent from "@/components/PaginationComponent" // Importação do novo componente
+import PaginationComponent from "@/components/PaginationComponent"
 
 // --- TIPOS E CONSTANTES ---
 export type MediaItem = { id: number; title: string; poster_path: string | null; backdrop_path: string | null; release_date: string | null; media_type: "movie" | "tv"; }
