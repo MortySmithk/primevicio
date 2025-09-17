@@ -226,7 +226,6 @@ function HomeInner({
     originCountry: string | null = null,
     language: string | null = null
 ) => {
-    if (loadingMore) return;
     setLoadingMore(true);
     let endpoint = `/discover/${type}?`;
     if (genreId !== null) {
@@ -239,16 +238,20 @@ function HomeInner({
       endpoint += `with_original_language=${language}&`;
     }
 
-    const data = await fetchFromAPI(endpoint, page);
-    const newItems = mapResults(data.results, type);
-    // Usando o callback de atualização para evitar a dependência de genreResults
-    setGenreResults(isInitial ? newItems : (prev) => [...prev, ...newItems]);
-    setHasMoreGenreResults(data.page < data.total_pages);
-    setGenrePage(page + 1);
-    setTotalPages(data.total_pages > 500 ? 500 : data.total_pages);
-    if (isInitial) setHeroBackdrop(newItems[0]?.backdrop_path ?? null);
-    setLoadingMore(false);
-}, [fetchFromAPI, mapResults, loadingMore]);
+    try {
+        const data = await fetchFromAPI(endpoint, page);
+        const newItems = mapResults(data.results, type);
+        setGenreResults(isInitial ? newItems : (prev) => [...prev, ...newItems]);
+        setHasMoreGenreResults(data.page < data.total_pages);
+        setGenrePage(page); // Corrigido para definir a página atual
+        setTotalPages(data.total_pages > 500 ? 500 : data.total_pages);
+        if (isInitial) setHeroBackdrop(newItems[0]?.backdrop_path ?? null);
+    } catch (error) {
+        console.error("Erro ao buscar por gênero:", error)
+    } finally {
+        setLoadingMore(false);
+    }
+}, [fetchFromAPI, mapResults]); // Removido 'loadingMore' da dependência
 
   const initializeData = useCallback(async (
     type: "movie" | "tv", 
@@ -265,7 +268,7 @@ function HomeInner({
     const genresData = await fetchFromAPI(`/genre/${type}/list?`, 1); 
     setGenres(genresData.genres); 
     
-    if (genreId !== null || originCountry !== null) { 
+    if (genreId !== null || originCountry !== null || language !== null) { 
         await fetchByGenre(genreId, type, 1, true, originCountry, language); 
     } else { 
         const newCategories: Category[] = initialCategories.map((cat) => ({ ...cat, items: [], page: 1, hasMore: true })); 
@@ -290,10 +293,10 @@ function HomeInner({
   }, [defaultMediaType, defaultGenre, defaultOriginCountry, defaultLanguage, initializeData]);
 
   useEffect(() => { 
-    if (!usePagination && genreLoadMoreInView && hasMoreGenreResults && selectedGenre !== null && !loading) { 
-      fetchByGenre(selectedGenre, mediaType, genrePage, false, defaultOriginCountry, defaultLanguage); 
+    if (!usePagination && genreLoadMoreInView && hasMoreGenreResults && (selectedGenre !== null || defaultOriginCountry || defaultLanguage) && !loading && !loadingMore) { 
+      fetchByGenre(selectedGenre, mediaType, genrePage + 1, false, defaultOriginCountry, defaultLanguage); 
     } 
-  }, [genreLoadMoreInView, hasMoreGenreResults, selectedGenre, mediaType, genrePage, fetchByGenre, loading, defaultOriginCountry, defaultLanguage, usePagination]);
+  }, [genreLoadMoreInView, hasMoreGenreResults, selectedGenre, mediaType, genrePage, fetchByGenre, loading, defaultOriginCountry, defaultLanguage, usePagination, loadingMore]);
 
   const handleGenreSelect = (genreId: number | null) => { 
     if (genreId === selectedGenre) return; 
@@ -302,7 +305,7 @@ function HomeInner({
   }
 
   const handlePageChange = (page: number) => {
-    setGenrePage(page);
+    window.scrollTo(0, 0); // Rola para o topo
     fetchByGenre(selectedGenre, mediaType, page, true, defaultOriginCountry, defaultLanguage);
   };
 
@@ -324,14 +327,13 @@ function HomeInner({
         </div>
 
         <AnimatePresence mode="wait">
-          {/* CORREÇÃO: Chave mais estável para evitar o "pisca-pisca" */}
           <motion.div key={selectedGenre === null ? "categories" : `genre-${selectedGenre}-${mediaType}-${defaultOriginCountry}-${defaultLanguage}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-            {loading ? ( <div className="flex h-64 items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-zinc-500" /></div> ) : selectedGenre === null ? ( categories.map((cat, index) => (<CategoryRow key={cat.endpoint} category={cat} onLoadMore={() => fetchCategoryData(index, mediaType, cat.page)} />)) ) : (
+            {loading ? ( <div className="flex h-64 items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-zinc-500" /></div> ) : selectedGenre === null && !defaultOriginCountry && !defaultLanguage ? ( categories.map((cat, index) => (<CategoryRow key={cat.endpoint} category={cat} onLoadMore={() => fetchCategoryData(index, mediaType, cat.page)} />)) ) : (
               <>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                   {genreResults.map((item) => (<MediaCard key={`${item.id}-genre`} item={item} />))}
                 </div>
-                {usePagination && (
+                {usePagination && totalPages > 1 && (
                   <div className="mt-8 flex justify-center">
                     <PaginationComponent currentPage={genrePage} totalPages={totalPages} onPageChange={handlePageChange} />
                   </div>
