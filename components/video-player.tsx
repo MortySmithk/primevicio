@@ -101,7 +101,7 @@ export default function VideoPlayer({
 
     return () => {
       video.removeEventListener("timeupdate", handleTimeUpdate);
-      video.removeEventListener("play", handlePlay);
+      video.removeEventListener("play", handlePause);
       video.removeEventListener("pause", handlePause);
     };
   }, [handleTimeUpdate, handlePlay, handlePause]);
@@ -161,11 +161,25 @@ export default function VideoPlayer({
   const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
+      if (isMobile && screen.orientation) {
+        try {
+          await screen.orientation.lock('landscape');
+        } catch (error) {
+          console.error("Failed to lock screen orientation:", error);
+        }
+      }
       await containerRef.current.requestFullscreen();
     } else {
+      if (isMobile && screen.orientation) {
+        try {
+          screen.orientation.unlock();
+        } catch (error) {
+          console.error("Failed to unlock screen orientation:", error);
+        }
+      }
       await document.exitFullscreen();
     }
-  }, []);
+  }, [isMobile]);
 
   const handleTouch = (e: React.TouchEvent<HTMLDivElement>) => {
     const now = new Date().getTime();
@@ -260,6 +274,26 @@ export default function VideoPlayer({
 
   return (
     <TooltipProvider delayDuration={150}>
+      <script src="https://cdn.jsdelivr.net/npm/disable-devtool@latest"></script>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            DisableDevtool({
+              disableMenu: true,
+              disableSelect: false,
+              disableCopy: false,
+              disableCut: true,
+              disablePaste: false,
+              clearLog: true,
+              interval: 500,
+              detectors: [0, 1, 3, 4, 5, 6, 7],
+              ondevtoolopen: function(type, next) {
+                window.location.href = 'https://i.ibb.co/5hH6bbp2/tentando-inspecionar-o-site.png';
+              }
+            });
+          `,
+        }}
+      />
       <div
         ref={containerRef}
         className={cn(
