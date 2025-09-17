@@ -148,6 +148,12 @@ const NewVideoPlayer: React.FC<NewVideoPlayerProps> = ({ src, title, onClose, on
         }
     }, []);
 
+    // ** CORREÇÃO 1: Lógica centralizada para clique/toque único **
+    const handleSingleClick = useCallback(() => {
+        togglePlay();
+        showControls();
+    }, [togglePlay, showControls]);
+
     const handleSeek = (amount: number) => {
         if (videoRef.current) {
             videoRef.current.currentTime += amount;
@@ -324,7 +330,7 @@ const NewVideoPlayer: React.FC<NewVideoPlayerProps> = ({ src, title, onClose, on
             }
         } else { // Single tap
             singleTapTimerRef.current = setTimeout(() => {
-                setControlsVisible(prev => !prev);
+                handleSingleClick(); // ** CORREÇÃO 1: Usando a nova função centralizada **
             }, 300);
         }
         setLastTap(now);
@@ -347,14 +353,14 @@ const NewVideoPlayer: React.FC<NewVideoPlayerProps> = ({ src, title, onClose, on
             {/* Overlay para cliques/toques */}
             <div 
               className="absolute inset-0 z-10" 
-              onClick={togglePlay}
+              onClick={handleSingleClick} // ** CORREÇÃO 1: Usando a nova função centralizada **
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
             />
             
              {/* Logo */}
              {showLogo && (
-                 <img src="https://i.ibb.co/s91tyczd/Gemini-Generated-Image-ejjiocejjiocejji-1.png" alt="Logo" className={`player-logo absolute bottom-14 left-4 h-8 z-10 pointer-events-none ${showLogo ? 'visible' : ''}`} />
+                 <img src="https://i.ibb.co/s91tyczd/Gemini-Generated-Image-ejjiocejjiocejji-1.png" alt="Logo" className={`player-logo absolute bottom-4 left-4 h-8 z-10 pointer-events-none transition-all duration-300 ${showLogo ? 'visible' : ''}`} />
              )}
 
             {/* Loading Spinner */}
@@ -371,15 +377,15 @@ const NewVideoPlayer: React.FC<NewVideoPlayerProps> = ({ src, title, onClose, on
                </div>
             </div>
 
-            {/* Botão de Play Central */}
+            {/* ** CORREÇÃO 2: Botão de Play Central aumentado ** */}
             {isPaused && !isLoading && (
-                 <button onClick={togglePlay} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-32 h-32 transition-transform hover:scale-105 bg-transparent border-none">
+                 <button onClick={togglePlay} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-48 h-48 transition-transform hover:scale-105 bg-transparent border-none">
                      <img src="https://i.ibb.co/DDnVHSHW/1-1.png" alt="Play" className="w-full h-full object-contain pointer-events-none" draggable="false" />
                  </button>
             )}
 
             {/* Controles */}
-            <div className={`absolute inset-0 flex flex-col justify-between transition-opacity duration-300 z-20 ${controlsVisible ? 'opacity-100' : 'opacity-0'}`}>
+            <div className={`absolute inset-0 flex flex-col justify-between transition-opacity duration-300 z-20 ${controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                 {/* Controles Superiores */}
                 <div className="p-4 flex justify-between items-center pointer-events-auto">
                     {onShowOptions && <button onClick={onShowOptions} className="text-white text-sm px-4 py-2 rounded-md bg-black/50 backdrop-blur-sm">Mais Opções</button>}
@@ -391,7 +397,7 @@ const NewVideoPlayer: React.FC<NewVideoPlayerProps> = ({ src, title, onClose, on
                     {/* Barra de Progresso */}
                     <div 
                         ref={progressContainerRef} 
-                        className="relative w-full mb-2 group cursor-pointer"
+                        className="relative w-full mb-2 group cursor-pointer py-2" // Adicionado py-2 para aumentar área de toque
                         onMouseDown={startScrubbing}
                         onMouseMove={(e) => { if(isScrubbing) { handleScrubbing(e); } else { setShowTooltip(true); handleScrubbing(e); } } }
                         onMouseLeave={() => setShowTooltip(false)}
@@ -399,11 +405,11 @@ const NewVideoPlayer: React.FC<NewVideoPlayerProps> = ({ src, title, onClose, on
                         onTouchMove={handleScrubbing}
                         onTouchEnd={endScrubbing}
                     >
-                         {showTooltip && <div className="absolute -top-4 px-2 py-1 bg-black/75 text-white text-xs rounded pointer-events-none transform -translate-x-1/2" style={{left: `${tooltipPosition}%`}}>{tooltipTime}</div>}
-                         <div className="bg-white/30 h-1.5 w-full rounded-full relative group-hover:h-3 transition-all duration-200">
+                         {showTooltip && <div className="absolute bottom-full mb-2 px-2 py-1 bg-black/75 text-white text-xs rounded pointer-events-none transform -translate-x-1/2" style={{left: `${tooltipPosition}%`}}>{tooltipTime}</div>}
+                         <div className="bg-white/30 h-1.5 w-full rounded-full relative group-hover:h-2 transition-all duration-200">
                              <div className="absolute top-0 left-0 h-full bg-white/50 rounded-full" style={{ width: `${buffered}%` }}></div>
                              <div className="absolute top-0 left-0 h-full bg-red-600 rounded-full" style={{ width: `${(currentTime / duration) * 100}%` }}>
-                                 <div className="absolute right-0 top-1/2 w-4 h-4 bg-red-600 rounded-full transform -translate-y-1/2 translate-x-1/2 scale-0 group-hover:scale-100 transition-transform duration-200"></div>
+                                 <div className="absolute right-0 top-1/2 w-3 h-3 bg-red-600 rounded-full transform -translate-y-1/2 translate-x-1/2 scale-0 group-hover:scale-100 transition-transform duration-200"></div>
                              </div>
                          </div>
                     </div>
