@@ -10,6 +10,7 @@ import { useFavorites, type FavoriteItem } from "@/components/favorites-context"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import PaginationComponent from "@/components/PaginationComponent" // Importação do novo componente
 
 // --- TIPOS E CONSTANTES ---
 export type MediaItem = { id: number; title: string; poster_path: string | null; backdrop_path: string | null; release_date: string | null; media_type: "movie" | "tv"; }
@@ -32,14 +33,11 @@ export function MediaCard({ item }: { item: MediaItem }) {
   const fav = isFavorite(item.id, item.media_type);
   const favItem: FavoriteItem = { id: item.id, media_type: item.media_type, title: item.title, poster_path: item.poster_path, backdrop_path: item.backdrop_path, release_date: item.release_date };
   
-  // ***** FUNÇÃO CORRIGIDA AQUI *****
   const copyToClipboard = (text: string, label: string) => {
-    // Verifica se o navegador suporta a API de Clipboard e se o contexto é seguro
     if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(text);
         toast({ title: "Copiado!", description: `${label} copiado com sucesso.` });
     } else {
-        // Se não for seguro, exibe um aviso em vez de causar um erro
         toast({
             variant: "destructive",
             title: "Cópia não permitida",
@@ -154,7 +152,19 @@ function ApiDocsSection({ stats, loadingStats }: { stats: Stats | null, loadingS
     )
 }
 
-function HomeInner({ defaultMediaType = "movie", defaultGenre }: { defaultMediaType?: "movie" | "tv"; defaultGenre?: number }) {
+function HomeInner({ 
+    defaultMediaType = "movie", 
+    defaultGenre, 
+    defaultOriginCountry, 
+    defaultLanguage,
+    usePagination = false
+}: { 
+    defaultMediaType?: "movie" | "tv"; 
+    defaultGenre?: number; 
+    defaultOriginCountry?: string;
+    defaultLanguage?: string;
+    usePagination?: boolean;
+}) {
   const [mediaType, setMediaType] = useState<"movie" | "tv">(defaultMediaType)
   const [categories, setCategories] = useState<Category[]>([])
   const [genres, setGenres] = useState<Genre[]>([])
@@ -167,6 +177,7 @@ function HomeInner({ defaultMediaType = "movie", defaultGenre }: { defaultMediaT
   const [heroBackdrop, setHeroBackdrop] = useState<string | null>(null)
   const [stats, setStats] = useState<Stats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [totalPages, setTotalPages] = useState(1);
 
   const { ref: genreLoadMoreRef, inView: genreLoadMoreInView } = useInView({ threshold: 0.5 })
 
@@ -185,14 +196,114 @@ function HomeInner({ defaultMediaType = "movie", defaultGenre }: { defaultMediaT
     fetchStats();
   }, []);
 
-  const fetchFromAPI = useCallback(async (endpoint: string) => { const res = await fetch(`${API_BASE_URL}${endpoint}${endpoint.includes("?") ? "&" : "?"}api_key=${API_KEY}&language=pt-BR`); if (!res.ok) throw new Error("A resposta da rede não foi bem-sucedida."); return res.json(); }, []);
+  const fetchFromAPI = useCallback(async (endpoint: string, page: number) => { 
+    const url = `${API_BASE_URL}${endpoint}${endpoint.includes("?") ? "&" : "?"}api_key=${API_KEY}&language=pt-BR&page=${page}`;
+    const res = await fetch(url); 
+    if (!res.ok) throw new Error("A resposta da rede não foi bem-sucedida."); 
+    return res.json(); 
+  }, []);
+
   const mapResults = useCallback((results: any[], type: "movie" | "tv"): MediaItem[] => results.map((item: any) => ({ id: item.id, title: item.title || item.name, poster_path: item.poster_path, backdrop_path: item.backdrop_path, release_date: item.release_date || item.first_air_date || null, media_type: type, })),[]);
-  const initializeData = useCallback(async (type: "movie" | "tv", genreId: number | null) => { setLoading(true); setGenreResults([]); setCategories([]); setHasMoreGenreResults(true); setGenrePage(1); const genresData = await fetchFromAPI(`/genre/${type}/list?`); setGenres(genresData.genres); if (genreId !== null) { await fetchByGenre(genreId, type, 1, true); } else { const newCategories: Category[] = initialCategories.map((cat) => ({ ...cat, items: [], page: 1, hasMore: true })); const categoryPromises = newCategories.map((cat) => fetchFromAPI(`/${type}/${cat.endpoint}?page=1`)); const categoryResults = await Promise.all(categoryPromises); categoryResults.forEach((data, index) => { newCategories[index].items = mapResults(data.results, type); newCategories[index].page = 2; newCategories[index].hasMore = data.page < data.total_pages; }); setCategories(newCategories); const firstBackdrop = newCategories[0]?.items?.[0]?.backdrop_path; setHeroBackdrop(firstBackdrop ?? null); } setLoading(false); }, [fetchFromAPI, mapResults]);
-  const fetchCategoryData = useCallback(async (categoryIndex: number, type: "movie" | "tv") => { const cat = categories[categoryIndex]; if (!cat || !cat.hasMore || loadingMore) return; setLoadingMore(true); try { const data = await fetchFromAPI(`/${type}/${cat.endpoint}?page=${cat.page}`); const newItems = mapResults(data.results, type); setCategories((prev) => prev.map((c, idx) => idx === categoryIndex ? { ...c, items: [...c.items, ...newItems], page: c.page + 1, hasMore: data.page < data.total_pages } : c)); } finally { setLoadingMore(false); } }, [categories, loadingMore, fetchFromAPI, mapResults]);
-  const fetchByGenre = useCallback(async (genreId: number, type: "movie" | "tv", page: number, isInitial = false) => { if (loadingMore) return; setLoadingMore(true); const data = await fetchFromAPI(`/discover/${type}?with_genres=${genreId}&page=${page}`); const newItems = mapResults(data.results, type); setGenreResults((prev) => (page === 1 ? newItems : [...prev, ...newItems])); setHasMoreGenreResults(data.page < data.total_pages); setGenrePage(page + 1); if (isInitial) setHeroBackdrop(newItems[0]?.backdrop_path ?? null); setLoadingMore(false); }, [fetchFromAPI, mapResults, loadingMore]);
-  useEffect(() => { setMediaType(defaultMediaType); setSelectedGenre(defaultGenre || null); initializeData(defaultMediaType, defaultGenre || null); }, [defaultMediaType, defaultGenre, initializeData]);
-  useEffect(() => { if (genreLoadMoreInView && hasMoreGenreResults && selectedGenre !== null && !loading) { fetchByGenre(selectedGenre, mediaType, genrePage); } }, [genreLoadMoreInView, hasMoreGenreResults, selectedGenre, mediaType, genrePage, fetchByGenre, loading]);
-  const handleGenreSelect = (genreId: number | null) => { if (genreId === selectedGenre) return; setSelectedGenre(genreId); initializeData(mediaType, genreId); }
+
+  const fetchCategoryData = useCallback(async (categoryIndex: number, type: "movie" | "tv", page: number) => { 
+    const cat = categories[categoryIndex]; 
+    if (!cat || !cat.hasMore || loadingMore) return; 
+    setLoadingMore(true); 
+    try { 
+      const data = await fetchFromAPI(`/${type}/${cat.endpoint}`, page); 
+      const newItems = mapResults(data.results, type); 
+      setCategories((prev) => prev.map((c, idx) => idx === categoryIndex ? { ...c, items: [...c.items, ...newItems], page: c.page + 1, hasMore: data.page < data.total_pages } : c)); 
+    } finally { 
+      setLoadingMore(false); 
+    } 
+  }, [categories, loadingMore, fetchFromAPI, mapResults]);
+
+  const fetchByGenre = useCallback(async (
+    genreId: number | null, 
+    type: "movie" | "tv", 
+    page: number, 
+    isInitial = false,
+    originCountry: string | null = null,
+    language: string | null = null
+) => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    let endpoint = `/discover/${type}?`;
+    if (genreId !== null) {
+      endpoint += `with_genres=${genreId}&`;
+    }
+    if (originCountry !== null) {
+      endpoint += `with_origin_country=${originCountry}&`;
+    }
+    if (language !== null) {
+      endpoint += `with_original_language=${language}&`;
+    }
+
+    const data = await fetchFromAPI(endpoint, page);
+    const newItems = mapResults(data.results, type);
+    setGenreResults(isInitial ? newItems : [...genreResults, ...newItems]);
+    setHasMoreGenreResults(data.page < data.total_pages);
+    setGenrePage(page + 1);
+    setTotalPages(data.total_pages > 500 ? 500 : data.total_pages);
+    if (isInitial) setHeroBackdrop(newItems[0]?.backdrop_path ?? null);
+    setLoadingMore(false);
+}, [fetchFromAPI, mapResults, loadingMore, genreResults]);
+
+  const initializeData = useCallback(async (
+    type: "movie" | "tv", 
+    genreId: number | null,
+    originCountry: string | null = null,
+    language: string | null = null
+) => { 
+    setLoading(true); 
+    setGenreResults([]); 
+    setCategories([]); 
+    setHasMoreGenreResults(true); 
+    setGenrePage(1); 
+    
+    const genresData = await fetchFromAPI(`/genre/${type}/list?`, 1); 
+    setGenres(genresData.genres); 
+    
+    if (genreId !== null || originCountry !== null) { 
+        await fetchByGenre(genreId, type, 1, true, originCountry, language); 
+    } else { 
+        const newCategories: Category[] = initialCategories.map((cat) => ({ ...cat, items: [], page: 1, hasMore: true })); 
+        const categoryPromises = newCategories.map((cat) => fetchFromAPI(`/${type}/${cat.endpoint}`, 1)); 
+        const categoryResults = await Promise.all(categoryPromises); 
+        categoryResults.forEach((data, index) => { 
+            newCategories[index].items = mapResults(data.results, type); 
+            newCategories[index].page = 2; 
+            newCategories[index].hasMore = data.page < data.total_pages; 
+        }); 
+        setCategories(newCategories); 
+        const firstBackdrop = newCategories[0]?.items?.[0]?.backdrop_path; 
+        setHeroBackdrop(firstBackdrop ?? null); 
+    } 
+    setLoading(false); 
+}, [fetchFromAPI, mapResults, fetchByGenre]);
+
+  useEffect(() => { 
+    setMediaType(defaultMediaType); 
+    setSelectedGenre(defaultGenre || null); 
+    initializeData(defaultMediaType, defaultGenre || null, defaultOriginCountry, defaultLanguage); 
+  }, [defaultMediaType, defaultGenre, defaultOriginCountry, defaultLanguage, initializeData]);
+
+  useEffect(() => { 
+    if (!usePagination && genreLoadMoreInView && hasMoreGenreResults && selectedGenre !== null && !loading) { 
+      fetchByGenre(selectedGenre, mediaType, genrePage, false, defaultOriginCountry, defaultLanguage); 
+    } 
+  }, [genreLoadMoreInView, hasMoreGenreResults, selectedGenre, mediaType, genrePage, fetchByGenre, loading, defaultOriginCountry, defaultLanguage, usePagination]);
+
+  const handleGenreSelect = (genreId: number | null) => { 
+    if (genreId === selectedGenre) return; 
+    setSelectedGenre(genreId); 
+    initializeData(mediaType, genreId); 
+  }
+
+  const handlePageChange = (page: number) => {
+    setGenrePage(page);
+    fetchByGenre(selectedGenre, mediaType, page, true, defaultOriginCountry, defaultLanguage);
+  };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -212,13 +323,18 @@ function HomeInner({ defaultMediaType = "movie", defaultGenre }: { defaultMediaT
         </div>
 
         <AnimatePresence mode="wait">
-          <motion.div key={selectedGenre === null ? "categories" : `genre-${selectedGenre}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-            {loading ? ( <div className="flex h-64 items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-zinc-500" /></div> ) : selectedGenre === null ? ( categories.map((cat, index) => (<CategoryRow key={cat.endpoint} category={cat} onLoadMore={() => fetchCategoryData(index, mediaType)} />)) ) : (
+          <motion.div key={selectedGenre === null ? "categories" : `genre-${selectedGenre}-${genrePage}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+            {loading ? ( <div className="flex h-64 items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-zinc-500" /></div> ) : selectedGenre === null ? ( categories.map((cat, index) => (<CategoryRow key={cat.endpoint} category={cat} onLoadMore={() => fetchCategoryData(index, mediaType, cat.page)} />)) ) : (
               <>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                   {genreResults.map((item) => (<MediaCard key={`${item.id}-genre`} item={item} />))}
                 </div>
-                {hasMoreGenreResults && ( <div ref={genreLoadMoreRef} className="flex h-28 items-center justify-center">{loadingMore && <Loader2 className="h-8 w-8 animate-spin text-zinc-500" />}</div> )}
+                {usePagination && (
+                  <div className="mt-8 flex justify-center">
+                    <PaginationComponent currentPage={genrePage} totalPages={totalPages} onPageChange={handlePageChange} />
+                  </div>
+                )}
+                {!usePagination && hasMoreGenreResults && ( <div ref={genreLoadMoreRef} className="flex h-28 items-center justify-center">{loadingMore && <Loader2 className="h-8 w-8 animate-spin text-zinc-500" />}</div> )}
               </>
             )}
           </motion.div>
@@ -228,6 +344,15 @@ function HomeInner({ defaultMediaType = "movie", defaultGenre }: { defaultMediaT
   )
 }
 
-export default function HomePage({ defaultMediaType = "movie", defaultGenre }: { defaultMediaType?: "movie" | "tv"; defaultGenre?: number }) {
-  return ( <HomeInner key={`${defaultMediaType}-${defaultGenre || 'all'}`} defaultMediaType={defaultMediaType} defaultGenre={defaultGenre} /> )
+export default function HomePage({ defaultMediaType = "movie", defaultGenre, defaultOriginCountry, defaultLanguage, usePagination }: { defaultMediaType?: "movie" | "tv"; defaultGenre?: number; defaultOriginCountry?: string; defaultLanguage?: string; usePagination?: boolean }) {
+  return ( 
+    <HomeInner 
+      key={`${defaultMediaType}-${defaultGenre || 'all'}-${defaultOriginCountry || 'all'}-${defaultLanguage || 'all'}`} 
+      defaultMediaType={defaultMediaType} 
+      defaultGenre={defaultGenre} 
+      defaultOriginCountry={defaultOriginCountry}
+      defaultLanguage={defaultLanguage}
+      usePagination={usePagination}
+    /> 
+  )
 }
