@@ -32,6 +32,10 @@ export default function VideoPlayer({
   src,
   title,
   onShowOptions,
+  mediaType,
+  tmdbId,
+  currentSeason,
+  currentEpisode,
 }: VideoPlayerProps) {
   const isMobile = useIsMobile();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -273,7 +277,18 @@ export default function VideoPlayer({
   };
   
   // CORREÇÃO: Usa uma abordagem mais segura para obter os searchParams
-  const downloadUrl = `/download?${new URL(src, window.location.origin).searchParams.toString()}`;
+  const downloadParams = new URL(src, window.location.origin).searchParams.toString();
+  
+  const formattedTitle = title.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-');
+  let filename = `${formattedTitle}-Prime-Vicio`;
+
+  if (mediaType === "tv" && currentSeason && currentEpisode) {
+      filename = `${formattedTitle}-S${currentSeason}E${currentEpisode}-Prime-Vicio`;
+  } else if (mediaType === "movie") {
+      filename = `${formattedTitle}-Prime-Vicio`;
+  }
+  
+  const downloadUrl = `/download?${downloadParams}&filename=${encodeURIComponent(filename)}`;
 
   return (
     <TooltipProvider delayDuration={150}>

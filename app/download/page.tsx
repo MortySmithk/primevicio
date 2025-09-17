@@ -8,6 +8,7 @@ export default function DownloadPage() {
   const searchParams = useSearchParams();
   const videoUrl = searchParams.get('videoUrl');
   const headers = searchParams.get('headers');
+  const filename = searchParams.get('filename') || "video-prime-vicio";
 
   if (!videoUrl) {
     return (
@@ -27,7 +28,7 @@ export default function DownloadPage() {
       <p className="mb-8 text-zinc-400 max-w-sm">
         Clique no botão abaixo para iniciar o download do arquivo.
       </p>
-      <a href={downloadProxyUrl} download>
+      <a href={downloadProxyUrl} download={filename}>
         <Button className="h-20 w-60 text-lg bg-yellow-400 text-black hover:bg-yellow-500 transition-colors">
           <Download className="mr-3 h-8 w-8" />
           Download
