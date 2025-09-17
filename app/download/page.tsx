@@ -28,7 +28,7 @@ export default function DownloadPage() {
       <p className="mb-8 text-zinc-400 max-w-sm">
         Clique no botão abaixo para iniciar o download do arquivo.
       </p>
-      <a href={downloadProxyUrl} download={filename}>
+      <a href={downloadProxyUrl} download={`${filename}.mp4`}>
         <Button className="h-20 w-60 text-lg bg-yellow-400 text-black hover:bg-yellow-500 transition-colors">
           <Download className="mr-3 h-8 w-8" />
           Download
