@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-// Tipos
+// Tipos (mantidos para compatibilidade)
 type Episode = { id: number; name: string; episode_number: number };
 type Season = { id: number; name: string; season_number: number };
 
@@ -23,18 +23,23 @@ type VideoPlayerProps = {
   mediaType: "movie" | "tv";
   tmdbId?: string;
   seasons?: Season[];
+  initialEpisodes?: Episode[];
   currentSeason?: number;
   currentEpisode?: number;
 };
 
-export default function VideoPlayer({ src, title, onShowOptions }: VideoPlayerProps) {
+export default function VideoPlayer({
+  src,
+  title,
+  onShowOptions,
+}: VideoPlayerProps) {
   const isMobile = useIsMobile();
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number>();
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
-  const lastTapRef = useRef(0);
-  const seekAnimationTimeoutRef = useRef<NodeJS.Timeout>();
+  const lastTap = useRef(0);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -44,173 +49,214 @@ export default function VideoPlayer({ src, title, onShowOptions }: VideoPlayerPr
   const [isLoading, setIsLoading] = useState(true);
   const [showControls, setShowControls] = useState(true);
   const [showLogo, setShowLogo] = useState(false);
-  const [seekIndicator, setSeekIndicator] = useState<'forward' | 'rewind' | null>(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState<{ time: string; position: number } | null>(null);
+  const [thumbnail, setThumbnail] = useState<{ src: string; time: number; left: number } | null>(null);
+  const [seekAnimation, setSeekAnimation] = useState<"forward" | "rewind" | null>(null);
 
   const formatTime = (seconds: number) => {
     const date = new Date(seconds * 1000);
     const hh = date.getUTCHours();
-    const mm = date.getUTCMinutes();
+    const mm = date.getUTCMinutes().toString().padStart(2, "0");
     const ss = date.getUTCSeconds().toString().padStart(2, "0");
     if (hh) {
-      return `${hh}:${mm.toString().padStart(2, "0")}:${ss}`;
+      return `${hh}:${mm}:${ss}`;
     }
     return `${mm}:${ss}`;
   };
 
-  // --- Funções de Controle do Player ---
-  const togglePlay = useCallback(() => {
+  const animateProgress = useCallback(() => {
+    if (videoRef.current && !isSeeking) {
+      setCurrentTime(videoRef.current.currentTime);
+      animationFrameRef.current = requestAnimationFrame(animateProgress);
+    }
+  }, [isSeeking]);
+
+  const startAnimation = useCallback(() => {
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    animationFrameRef.current = requestAnimationFrame(animateProgress);
+  }, [animateProgress]);
+
+  const stopAnimation = useCallback(() => {
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+  }, []);
+
+  const handlePlay = useCallback(() => {
+    setIsPlaying(true);
+    startAnimation();
+  }, [startAnimation]);
+
+  const handlePause = useCallback(() => {
+    setIsPlaying(false);
+    stopAnimation();
+  }, [stopAnimation]);
+
+  useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    video.paused ? video.play() : video.pause();
-  }, []);
 
-  const triggerSeekAnimation = (direction: 'forward' | 'rewind') => {
-    setSeekIndicator(direction);
-    clearTimeout(seekAnimationTimeoutRef.current);
-    seekAnimationTimeoutRef.current = setTimeout(() => {
-      setSeekIndicator(null);
-    }, 600);
+    const handleTimeUpdate = () => {
+      if (!isSeeking) {
+         setCurrentTime(video.currentTime);
+      }
+      if (video.currentTime >= 10) {
+        setShowLogo(true);
+      }
+    };
+
+    video.addEventListener("timeupdate", handleTimeUpdate);
+    video.addEventListener("play", handlePlay);
+    video.addEventListener("pause", handlePause);
+
+    return () => {
+      video.removeEventListener("timeupdate", handleTimeUpdate);
+      video.removeEventListener("play", handlePlay);
+      video.removeEventListener("pause", handlePause);
+      stopAnimation();
+    };
+  }, [isSeeking, handlePlay, handlePause, stopAnimation]);
+
+  // Controla a visibilidade dos controles
+  useEffect(() => {
+    const hideControls = () => isPlaying && setShowControls(false);
+    const resetTimeout = () => {
+      clearTimeout(controlsTimeoutRef.current);
+      setShowControls(true);
+      controlsTimeoutRef.current = setTimeout(hideControls, 3000);
+    };
+
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener("mousemove", resetTimeout);
+      container.addEventListener("mouseleave", hideControls);
+    }
+    resetTimeout();
+
+    return () => {
+      clearTimeout(controlsTimeoutRef.current);
+      if (container) {
+        container.removeEventListener("mousemove", resetTimeout);
+        container.removeEventListener("mouseleave", hideControls);
+      }
+    };
+  }, [isPlaying]);
+
+  const handleSliderChange = (value: number[]) => {
+    if (!isSeeking) setIsSeeking(true);
+    stopAnimation();
+    setCurrentTime(value[0]);
   };
 
-  const handleSeek = useCallback((amount: number) => {
+  const handleSliderCommit = (value: number[]) => {
     if (videoRef.current) {
-      videoRef.current.currentTime += amount;
-      triggerSeekAnimation(amount > 0 ? 'forward' : 'rewind');
+      videoRef.current.currentTime = value[0];
     }
-  }, []);
+    setIsSeeking(false);
+    if(isPlaying) startAnimation();
+  };
   
-  const toggleFullscreen = useCallback(async () => {
+  const triggerSeekAnimation = (direction: "forward" | "rewind") => {
+    setSeekAnimation(direction);
+    setTimeout(() => setSeekAnimation(null), 600);
+  };
+
+  const togglePlay = () => videoRef.current?.paused ? videoRef.current?.play() : videoRef.current?.pause();
+  
+  const seek = (amount: number) => {
+    if (videoRef.current) {
+        videoRef.current.currentTime += amount;
+        triggerSeekAnimation(amount > 0 ? "forward" : "rewind");
+    }
+  };
+
+  const toggleFullscreen = async () => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
       await containerRef.current.requestFullscreen();
     } else {
       await document.exitFullscreen();
     }
-  }, []);
+  };
 
-  // --- Manipuladores de Eventos ---
-  const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
-    const now = Date.now();
-    const timeSinceLastTap = now - lastTapRef.current;
-    
-    // Lógica de Toque Duplo (Celular)
-    if (isMobile && timeSinceLastTap < 300) {
-      const target = e.currentTarget as HTMLElement;
-      const rect = target.getBoundingClientRect();
-      const touchX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-      const touchPosition = (touchX - rect.left) / rect.width;
+  // Double tap to seek for mobile
+  const handleTouch = (e: React.TouchEvent<HTMLDivElement>) => {
+    const now = new Date().getTime();
+    const timeSinceLastTap = now - lastTap.current;
 
-      if (touchPosition < 0.4) { // Lado esquerdo
-        handleSeek(-10);
-      } else if (touchPosition > 0.6) { // Lado direito
-        handleSeek(10);
+    if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const touchX = e.touches[0].clientX - rect.left;
+      
+      if (touchX < rect.width / 2) {
+        seek(-10);
+      } else {
+        seek(10);
       }
-      lastTapRef.current = 0; // Reseta para evitar triplo toque
-      return;
-    }
-    
-    lastTapRef.current = now;
-
-    // Lógica de Toque/Clique Único
-    if(isMobile) {
-      setShowControls(s => !s);
     } else {
+        setShowControls(s => !s);
+    }
+    lastTap.current = now;
+  };
+  
+  const handleAreaClick = () => {
+    if (!isMobile) {
       togglePlay();
     }
   };
-  
-  // --- Efeitos ---
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
 
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
-    const onTimeUpdate = () => {
-      if (!isSeeking) setCurrentTime(video.currentTime);
-      if (video.currentTime >= 10 && !showLogo) setShowLogo(true);
-    };
-    const onLoadedMetadata = () => setDuration(video.duration);
-    const onWaiting = () => setIsLoading(true);
-    const onCanPlay = () => setIsLoading(false);
+  // Keyboard controls
+  useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+          if ((e.target as HTMLElement).tagName === 'INPUT') return;
+          switch (e.key) {
+              case "ArrowRight":
+                  seek(10);
+                  break;
+              case "ArrowLeft":
+                  seek(-10);
+                  break;
+              case " ":
+                  e.preventDefault();
+                  togglePlay();
+                  break;
+              case "f":
+                  toggleFullscreen();
+                  break;
+          }
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [seek, togglePlay, toggleFullscreen]);
+
+
+  useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
-    
-    video.addEventListener("play", onPlay);
-    video.addEventListener("pause", onPause);
-    video.addEventListener("timeupdate", onTimeUpdate);
-    video.addEventListener("loadedmetadata", onLoadedMetadata);
-    video.addEventListener("waiting", onWaiting);
-    video.addEventListener("canplay", onCanPlay);
     document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
 
-    return () => {
-      video.removeEventListener("play", onPlay);
-      video.removeEventListener("pause", onPause);
-      video.removeEventListener("timeupdate", onTimeUpdate);
-      video.removeEventListener("loadedmetadata", onLoadedMetadata);
-      video.removeEventListener("waiting", onWaiting);
-      video.removeEventListener("canplay", onCanPlay);
-      document.removeEventListener("fullscreenchange", onFullscreenChange);
-    };
-  }, [isSeeking, showLogo]);
-
-  useEffect(() => {
-    const hide = () => { if (isPlaying) setShowControls(false); };
-    const resetTimeout = () => {
-      clearTimeout(controlsTimeoutRef.current);
-      setShowControls(true);
-      controlsTimeoutRef.current = setTimeout(hide, 3000);
-    };
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener("mousemove", resetTimeout);
-      container.addEventListener("mouseleave", hide);
-    }
-    resetTimeout();
-    return () => {
-      clearTimeout(controlsTimeoutRef.current);
-      if (container) {
-        container.removeEventListener("mousemove", resetTimeout);
-        container.removeEventListener("mouseleave", hide);
-      }
-    };
-  }, [isPlaying]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-        if ((e.target as HTMLElement).tagName === 'INPUT') return;
-        switch(e.key) {
-            case ' ': e.preventDefault(); togglePlay(); break;
-            case 'ArrowLeft': handleSeek(-10); break;
-            case 'ArrowRight': handleSeek(10); break;
-            case 'f': toggleFullscreen(); break;
-        }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSeek, togglePlay, toggleFullscreen]);
-  
-  // --- Handlers da Barra de Progresso ---
   const handleProgressHover = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!duration || isMobile) return;
-    const rect = progressRef.current!.getBoundingClientRect();
-    const position = (e.clientX - rect.left) / rect.width;
-    const time = duration * position;
-    setThumbnailPreview({
-        time: formatTime(time),
-        position: position * 100
-    });
-  };
+    if (!videoRef.current || isMobile) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percentage = x / rect.width;
+    const time = duration * percentage;
 
-  const handleSliderChange = (value: number[]) => {
-    setIsSeeking(true);
-    setCurrentTime(value[0]);
-  };
-
-  const handleSliderCommit = (value: number[]) => {
-    if (videoRef.current) videoRef.current.currentTime = value[0];
-    setIsSeeking(false);
+    const thumbnailCanvas = document.createElement("canvas");
+    thumbnailCanvas.width = 160;
+    thumbnailCanvas.height = 90;
+    const ctx = thumbnailCanvas.getContext("2d");
+    if (ctx) {
+        // Clonamos o video para não afetar o principal
+        const tempVideo = videoRef.current.cloneNode(true) as HTMLVideoElement;
+        tempVideo.currentTime = time;
+        tempVideo.onseeked = () => {
+            ctx.drawImage(tempVideo, 0, 0, 160, 90);
+            setThumbnail({
+                src: thumbnailCanvas.toDataURL(),
+                time: time,
+                left: x
+            });
+        }
+    }
   };
 
   return (
@@ -219,55 +265,60 @@ export default function VideoPlayer({ src, title, onShowOptions }: VideoPlayerPr
         ref={containerRef}
         className={cn(
           "relative w-full aspect-video bg-black rounded-xl overflow-hidden group",
-          !showControls && !isMobile && isPlaying && "cursor-none"
+          !showControls && "cursor-none"
         )}
+        onTouchEnd={isMobile ? handleTouch : undefined}
       >
         <video
           ref={videoRef}
           src={src}
           className="h-full w-full object-contain"
           autoPlay
+          onClick={handleAreaClick}
+          onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
+          onCanPlay={() => setIsLoading(false)}
+          onWaiting={() => setIsLoading(true)}
+          onPlaying={() => setIsLoading(false)}
+          crossOrigin="anonymous" // Necessário para gerar thumbnail do canvas
         />
         
-        {/* Camada de Interação */}
-        <div className="absolute inset-0 z-10" onClick={handleInteraction} />
+        {/* Animação de Avançar/Retroceder */}
+        <AnimatePresence>
+          {seekAnimation && (
+            <motion.div
+              key={seekAnimation}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: [0, 1, 0], scale: 1.2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.6, ease: "easeInOut" }}
+              className={cn(
+                "absolute top-1/2 -translate-y-1/2 z-20 flex items-center justify-center text-white bg-black/40 p-4 rounded-full pointer-events-none",
+                seekAnimation === 'rewind' && 'left-1/4 -translate-x-1/2',
+                seekAnimation === 'forward' && 'right-1/4 translate-x-1/2'
+              )}
+            >
+             {seekAnimation === 'rewind' ? <ChevronsLeft size={48} /> : <ChevronsRight size={48} />}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <AnimatePresence>
           {showLogo && (
             <motion.img
-              src="https://i.ibb.co/s91tyczd/Gemini-Generated-Image-ejjiocejjiocejji-1.png"
+              src="https://i.ibb.co/s91tycz/Gemini-Generated-Image-ejjiocejjiocejji-1.png"
               alt="Logo"
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.5 }}
-              className="absolute bottom-14 left-4 h-6 z-20 pointer-events-none"
+              className="absolute bottom-0 left-0 h-6 z-20 pointer-events-none"
             />
           )}
         </AnimatePresence>
 
         {isLoading && <div className="absolute inset-0 flex items-center justify-center bg-black/50 pointer-events-none z-30"><Loader2 className="h-10 w-10 animate-spin text-white" /></div>}
-        
-        {/* Animação de Avançar/Retroceder */}
-        <AnimatePresence>
-            {seekIndicator && (
-                <motion.div
-                    key={seekIndicator}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.2 }}
-                    className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
-                >
-                    <div className="bg-black/50 rounded-full p-4">
-                        {seekIndicator === 'forward' ? <ChevronsRight className="h-10 w-10 text-white" /> : <ChevronsLeft className="h-10 w-10 text-white" />}
-                    </div>
-                </motion.div>
-            )}
-        </AnimatePresence>
-
 
         <AnimatePresence>
-          {!isPlaying && !isLoading && (
+          {!isPlaying && !isLoading &&(
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -294,37 +345,53 @@ export default function VideoPlayer({ src, title, onShowOptions }: VideoPlayerPr
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="absolute inset-0 z-20 flex flex-col justify-between pointer-events-none"
+              className="absolute inset-0 z-10 flex flex-col justify-between pointer-events-none"
             >
-              <div className="p-3 pointer-events-auto">
-                {onShowOptions && <Button variant="ghost" className="h-auto px-4 py-2 text-sm text-white bg-zinc-800/80 hover:bg-zinc-700/80 backdrop-blur-sm" onClick={onShowOptions}>Mais Opções</Button>}
+              <div className="p-3 pointer-events-auto flex justify-between items-center">
+                <Button variant="ghost" className="h-auto px-4 py-2 text-sm text-white bg-zinc-800/80 hover:bg-zinc-700/80 backdrop-blur-sm" onClick={onShowOptions}>
+                  Mais Opções
+                </Button>
+                 <h1 className="text-white font-bold text-lg bg-black/30 p-2 rounded-md">{title}</h1>
               </div>
 
               <div className="bg-gradient-to-t from-black/70 to-transparent p-3 md:p-4 pointer-events-auto">
-                <div ref={progressRef} className="relative w-full" onMouseMove={handleProgressHover} onMouseLeave={() => setThumbnailPreview(null)}>
-                  {thumbnailPreview && (
-                      <div className="absolute bottom-6 bg-black/80 text-white text-xs px-2 py-1 rounded-md" style={{ left: `${thumbnailPreview.position}%`, transform: 'translateX(-50%)' }}>
-                          {thumbnailPreview.time}
-                      </div>
-                  )}
+                <div
+                  ref={progressRef}
+                  className="relative group/progress"
+                  onMouseMove={handleProgressHover}
+                  onMouseLeave={() => setThumbnail(null)}
+                >
                   <Slider
                     value={[currentTime]}
                     max={duration || 1}
-                    step={1}
+                    step={0.1}
                     onValueChange={handleSliderChange}
                     onValueCommit={handleSliderCommit}
                     className="w-full h-2 mb-2"
                   />
+                  {thumbnail && (
+                    <div
+                      className="absolute bottom-full mb-2 -translate-x-1/2 pointer-events-none"
+                      style={{ left: `${thumbnail.left}px` }}
+                    >
+                      <div className="relative bg-black border-2 border-white rounded-md w-40 h-[90px] overflow-hidden">
+                         <img src={thumbnail.src} className="w-full h-full object-cover" />
+                         <p className="absolute bottom-1 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+                           {formatTime(thumbnail.time)}
+                         </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center justify-between text-white">
                   <div className="flex items-center gap-1 md:gap-2">
                     <Tooltip><TooltipTrigger asChild><Button onClick={togglePlay} size="icon" variant="ghost">{isPlaying ? <Pause /> : <Play />}</Button></TooltipTrigger><TooltipContent>{isPlaying ? "Pausar" : "Reproduzir"}</TooltipContent></Tooltip>
-                    <Tooltip><TooltipTrigger asChild><Button onClick={() => handleSeek(-10)} size="icon" variant="ghost"><Rewind /></Button></TooltipTrigger><TooltipContent>-10s</TooltipContent></Tooltip>
-                    <Tooltip><TooltipTrigger asChild><Button onClick={() => handleSeek(10)} size="icon" variant="ghost"><FastForward /></Button></TooltipTrigger><TooltipContent>+10s</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button onClick={() => seek(-10)} size="icon" variant="ghost"><Rewind /></Button></TooltipTrigger><TooltipContent>-10s (←)</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button onClick={() => seek(10)} size="icon" variant="ghost"><FastForward /></Button></TooltipTrigger><TooltipContent>+10s (→)</TooltipContent></Tooltip>
                     <span className="text-xs font-mono">{formatTime(currentTime)} / {formatTime(duration)}</span>
                   </div>
                   <div className="flex items-center gap-1 md:gap-2">
-                    <Tooltip><TooltipTrigger asChild><Button onClick={toggleFullscreen} size="icon" variant="ghost">{isFullscreen ? <Minimize /> : <Maximize />}</Button></TooltipTrigger><TooltipContent>Tela Cheia</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button onClick={toggleFullscreen} size="icon" variant="ghost">{isFullscreen ? <Minimize /> : <Maximize />}</Button></TooltipTrigger><TooltipContent>Tela Cheia (f)</TooltipContent></Tooltip>
                   </div>
                 </div>
               </div>
@@ -335,4 +402,3 @@ export default function VideoPlayer({ src, title, onShowOptions }: VideoPlayerPr
     </TooltipProvider>
   );
 }
-
