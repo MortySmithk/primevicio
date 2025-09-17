@@ -3,9 +3,19 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
+  const { searchParams, host: requestHost } = new URL(request.url);
   const videoUrl = searchParams.get("videoUrl");
   const encodedHeaders = searchParams.get("headers");
+  const referer = request.headers.get("referer");
+
+  // Validação de segurança: Verifica se a requisição vem do seu próprio site
+  const allowedHost = referer ? new URL(referer).host : null;
+  const isAllowed = allowedHost === requestHost || allowedHost?.includes('localhost');
+
+  if (!isAllowed) {
+    console.warn(`[VideoProxy] Bloqueio de referer: ${referer}`);
+    return new NextResponse("Acesso não autorizado.", { status: 403 });
+  }
 
   if (!videoUrl) {
     return new NextResponse("URL do vídeo não fornecida.", { status: 400 });
@@ -94,3 +104,4 @@ export async function OPTIONS() {
     },
   });
 }
+

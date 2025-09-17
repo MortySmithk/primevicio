@@ -201,7 +201,7 @@ export default function VideoPlayer({
             <motion.img
               src="https://i.ibb.co/s91tyczd/Gemini-Generated-Image-ejjiocejjiocejji-1.png"
               alt="Logo"
-              initial={{ y: -100, opacity: 0 }}
+              initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.5 }}
               className="absolute bottom-0 left-0 h-6 z-20 pointer-events-none"
@@ -275,3 +275,4 @@ export default function VideoPlayer({
     </TooltipProvider>
   );
 }
+
