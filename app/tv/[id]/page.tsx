@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Star, Calendar, PlayCircle, ChevronDown, Loader2, Tv, Heart } from 'lucide-react'
-import VideoPlayer from '@/components/video-player' // Revertido
+import VideoPlayer from '@/components/video-player'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { useFavorites, type FavoriteItem } from "@/components/favorites-context"
@@ -14,7 +14,8 @@ const API_KEY = "001bbf841bab48f314947688a8230535"
 type TVDetails = { id: number; name: string; overview: string; poster_path: string | null; backdrop_path: string | null; first_air_date: string; vote_average: number; number_of_seasons: number; seasons: { id: number; name: string; season_number: number; episode_count: number }[]; };
 type SeasonDetails = { episodes: Episode[] };
 type Episode = { id: number; name: string; episode_number: number; overview: string; still_path: string | null; };
-type Stream = { url: string; name: string; description: string; proxyHeaders?: any; };
+// Tipagem do Stream atualizada para incluir a URL do spritesheet
+type Stream = { url: string; name: string; description: string; proxyHeaders?: any; spriteUrl?: string; };
 
 const API_BASE_URL = "https://api.themoviedb.org/3";
 
@@ -114,6 +115,8 @@ function TVDetailInner({ id }: { id: string }) {
               seasons={tv.seasons}
               currentSeason={selectedSeason}
               currentEpisode={activeEpisode.episode_number}
+              // 👇 PROP ADICIONADA AQUI 👇
+              thumbnailSpriteSrc={streamToPlay.spriteUrl}
             />
           </div>
         </motion.div>
@@ -187,4 +190,3 @@ function TVDetailInner({ id }: { id: string }) {
 export default function TVDetailPage({ params }: { params: { id: string } }) {
     return <TVDetailInner id={params.id} />;
 }
-

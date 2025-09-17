@@ -303,7 +303,7 @@ export default function VideoPlayer({
         <AnimatePresence>
           {showLogo && (
             <motion.img
-              src="https://i.ibb.co/s91tycz/Gemini-Generated-Image-ejjiocejjiocejji-1.png"
+              src="https://i.ibb.co/s91tyczd/Gemini-Generated-Image-ejjiocejjiocejji-1.png"
               alt="Logo"
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}

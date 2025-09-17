@@ -21,7 +21,10 @@ async function getFromFirestore(tmdbId: string, season: string, episode: string)
                     .map((data: any) => ({
                         url: data.url,
                         name: "Servidor Principal",
-                        description: `Qualidade ${data.quality || 'HD'}`
+                        description: `Qualidade ${data.quality || 'HD'}`,
+                        // 👇 ADICIONADO AQUI 👇
+                        // Adiciona a URL do spritesheet, se existir no seu banco de dados
+                        spriteUrl: data.spriteUrl || null
                     }));
                 
                 if (validStreams.length > 0) {

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { Star, Calendar, Clock, PlayCircle, Clapperboard, Heart } from 'lucide-react'
-import VideoPlayer from '@/components/video-player' // Revertido
+import VideoPlayer from '@/components/video-player'
 import { Button } from "@/components/ui/button"
 import { useFavorites, type FavoriteItem } from "@/components/favorites-context"
 import { cn } from "@/lib/utils"
@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils"
 const API_KEY = "001bbf841bab48f314947688a8230535" 
 
 type MovieDetails = { id: number; title: string; overview: string; poster_path: string | null; backdrop_path: string | null; release_date: string; vote_average: number; runtime: number; };
-type Stream = { url: string; name: string; description: string; proxyHeaders?: any; };
+// Tipagem do Stream atualizada para incluir a URL do spritesheet
+type Stream = { url: string; name: string; description: string; proxyHeaders?: any; spriteUrl?: string; };
 
 const API_BASE_URL = "https://api.themoviedb.org/3";
 
@@ -120,6 +121,8 @@ function MovieDetailInner({ id }: { id: string }) {
                   onShowOptions={() => setSelectedStream(null)}
                   mediaType="movie"
                   tmdbId={id}
+                  // 👇 PROP ADICIONADA AQUI 👇
+                  thumbnailSpriteSrc={selectedStream.spriteUrl}
               />
           </div>
         </motion.div>
@@ -131,4 +134,3 @@ function MovieDetailInner({ id }: { id: string }) {
 export default function MovieDetailPage({ params }: { params: { id: string } }) {
     return <MovieDetailInner id={params.id} />
 }
-
