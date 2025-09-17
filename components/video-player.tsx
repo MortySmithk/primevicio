@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Play, Pause, Maximize, Minimize, Rewind, FastForward, Check, Loader2, ChevronsRight, ChevronsLeft
+  Play, Pause, Maximize, Minimize, Rewind, FastForward, Loader2, ChevronsRight, ChevronsLeft
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -37,9 +37,11 @@ export default function VideoPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
-  const animationFrameRef = useRef<number>();
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
   const lastTap = useRef(0);
+  const thumbnailDebounceRef = useRef<NodeJS.Timeout>();
+  // Criamos um vídeo temporário para gerar thumbnails, evitando clonar toda hora.
+  const tempVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -52,6 +54,20 @@ export default function VideoPlayer({
   const [thumbnail, setThumbnail] = useState<{ src: string; time: number; left: number } | null>(null);
   const [seekAnimation, setSeekAnimation] = useState<"forward" | "rewind" | null>(null);
 
+  // Inicializa o vídeo temporário para thumbnails quando o player principal carregar
+  useEffect(() => {
+    if (videoRef.current && !tempVideoRef.current) {
+        const tempVideo = document.createElement('video');
+        tempVideo.src = videoRef.current.src;
+        tempVideo.crossOrigin = "anonymous";
+        tempVideo.muted = true; // Essencial para evitar o bug do som
+        tempVideo.width = 160;
+        tempVideo.height = 90;
+        tempVideo.preload = 'auto';
+        tempVideoRef.current = tempVideo;
+    }
+  }, [src]);
+
   const formatTime = (seconds: number) => {
     const date = new Date(seconds * 1000);
     const hh = date.getUTCHours();
@@ -63,44 +79,21 @@ export default function VideoPlayer({
     return `${mm}:${ss}`;
   };
 
-  const animateProgress = useCallback(() => {
-    if (videoRef.current && !isSeeking) {
-      setCurrentTime(videoRef.current.currentTime);
-      animationFrameRef.current = requestAnimationFrame(animateProgress);
-    }
-  }, [isSeeking]);
-
-  const startAnimation = useCallback(() => {
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-    animationFrameRef.current = requestAnimationFrame(animateProgress);
-  }, [animateProgress]);
-
-  const stopAnimation = useCallback(() => {
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-  }, []);
-
-  const handlePlay = useCallback(() => {
-    setIsPlaying(true);
-    startAnimation();
-  }, [startAnimation]);
-
-  const handlePause = useCallback(() => {
-    setIsPlaying(false);
-    stopAnimation();
-  }, [stopAnimation]);
+  const handleTimeUpdate = useCallback(() => {
+      if (videoRef.current && !isSeeking) {
+          setCurrentTime(videoRef.current.currentTime);
+          if (videoRef.current.currentTime >= 10 && !showLogo) {
+              setShowLogo(true);
+          }
+      }
+  }, [isSeeking, showLogo]);
+  
+  const handlePlay = useCallback(() => setIsPlaying(true), []);
+  const handlePause = useCallback(() => setIsPlaying(false), []);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-
-    const handleTimeUpdate = () => {
-      if (!isSeeking) {
-         setCurrentTime(video.currentTime);
-      }
-      if (video.currentTime >= 10) {
-        setShowLogo(true);
-      }
-    };
 
     video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("play", handlePlay);
@@ -110,11 +103,9 @@ export default function VideoPlayer({
       video.removeEventListener("timeupdate", handleTimeUpdate);
       video.removeEventListener("play", handlePlay);
       video.removeEventListener("pause", handlePause);
-      stopAnimation();
     };
-  }, [isSeeking, handlePlay, handlePause, stopAnimation]);
+  }, [handleTimeUpdate, handlePlay, handlePause]);
 
-  // Controla a visibilidade dos controles
   useEffect(() => {
     const hideControls = () => isPlaying && setShowControls(false);
     const resetTimeout = () => {
@@ -140,9 +131,10 @@ export default function VideoPlayer({
   }, [isPlaying]);
 
   const handleSliderChange = (value: number[]) => {
-    if (!isSeeking) setIsSeeking(true);
-    stopAnimation();
+    if (!videoRef.current) return;
+    setIsSeeking(true);
     setCurrentTime(value[0]);
+    videoRef.current.currentTime = value[0];
   };
 
   const handleSliderCommit = (value: number[]) => {
@@ -150,7 +142,6 @@ export default function VideoPlayer({
       videoRef.current.currentTime = value[0];
     }
     setIsSeeking(false);
-    if(isPlaying) startAnimation();
   };
   
   const triggerSeekAnimation = (direction: "forward" | "rewind") => {
@@ -160,23 +151,22 @@ export default function VideoPlayer({
 
   const togglePlay = () => videoRef.current?.paused ? videoRef.current?.play() : videoRef.current?.pause();
   
-  const seek = (amount: number) => {
+  const seek = useCallback((amount: number) => {
     if (videoRef.current) {
         videoRef.current.currentTime += amount;
         triggerSeekAnimation(amount > 0 ? "forward" : "rewind");
     }
-  };
+  }, []);
 
-  const toggleFullscreen = async () => {
+  const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
       await containerRef.current.requestFullscreen();
     } else {
       await document.exitFullscreen();
     }
-  };
+  }, []);
 
-  // Double tap to seek for mobile
   const handleTouch = (e: React.TouchEvent<HTMLDivElement>) => {
     const now = new Date().getTime();
     const timeSinceLastTap = now - lastTap.current;
@@ -197,35 +187,22 @@ export default function VideoPlayer({
   };
   
   const handleAreaClick = () => {
-    if (!isMobile) {
-      togglePlay();
-    }
+    if (!isMobile) togglePlay();
   };
 
-  // Keyboard controls
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
           if ((e.target as HTMLElement).tagName === 'INPUT') return;
           switch (e.key) {
-              case "ArrowRight":
-                  seek(10);
-                  break;
-              case "ArrowLeft":
-                  seek(-10);
-                  break;
-              case " ":
-                  e.preventDefault();
-                  togglePlay();
-                  break;
-              case "f":
-                  toggleFullscreen();
-                  break;
+              case "ArrowRight": seek(10); break;
+              case "ArrowLeft": seek(-10); break;
+              case " ": e.preventDefault(); togglePlay(); break;
+              case "f": toggleFullscreen(); break;
           }
       };
       window.addEventListener("keydown", handleKeyDown);
       return () => window.removeEventListener("keydown", handleKeyDown);
   }, [seek, togglePlay, toggleFullscreen]);
-
 
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -233,30 +210,52 @@ export default function VideoPlayer({
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
 
+  const generateThumbnail = (time: number, onGenerated: (src: string) => void) => {
+    const tempVideo = tempVideoRef.current;
+    if (!tempVideo) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 160;
+    canvas.height = 90;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const onSeeked = () => {
+        ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
+        onGenerated(canvas.toDataURL());
+        tempVideo.removeEventListener('seeked', onSeeked);
+    };
+
+    tempVideo.addEventListener('seeked', onSeeked);
+    tempVideo.currentTime = time;
+  };
+
   const handleProgressHover = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!videoRef.current || isMobile) return;
+    if (!videoRef.current || isMobile || !duration) return;
+
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const percentage = x / rect.width;
+    const percentage = Math.max(0, Math.min(1, x / rect.width));
     const time = duration * percentage;
 
-    const thumbnailCanvas = document.createElement("canvas");
-    thumbnailCanvas.width = 160;
-    thumbnailCanvas.height = 90;
-    const ctx = thumbnailCanvas.getContext("2d");
-    if (ctx) {
-        // Clonamos o video para não afetar o principal
-        const tempVideo = videoRef.current.cloneNode(true) as HTMLVideoElement;
-        tempVideo.currentTime = time;
-        tempVideo.onseeked = () => {
-            ctx.drawImage(tempVideo, 0, 0, 160, 90);
-            setThumbnail({
-                src: thumbnailCanvas.toDataURL(),
-                time: time,
-                left: x
-            });
-        }
+    // Atualiza a posição da caixa da miniatura imediatamente
+    setThumbnail(prev => ({ src: prev?.src || '', time, left: x }));
+    
+    // Usa debounce para evitar gerar miniaturas excessivamente
+    if (thumbnailDebounceRef.current) {
+        clearTimeout(thumbnailDebounceRef.current);
     }
+
+    thumbnailDebounceRef.current = setTimeout(() => {
+        generateThumbnail(time, (src) => {
+            setThumbnail(prev => prev ? { ...prev, src } : null);
+        });
+    }, 20); // Um debounce curto para fluidez
+  };
+
+  const handleProgressLeave = () => {
+    if (thumbnailDebounceRef.current) clearTimeout(thumbnailDebounceRef.current);
+    setThumbnail(null);
   };
 
   return (
@@ -279,10 +278,9 @@ export default function VideoPlayer({
           onCanPlay={() => setIsLoading(false)}
           onWaiting={() => setIsLoading(true)}
           onPlaying={() => setIsLoading(false)}
-          crossOrigin="anonymous" // Necessário para gerar thumbnail do canvas
+          crossOrigin="anonymous"
         />
         
-        {/* Animação de Avançar/Retroceder */}
         <AnimatePresence>
           {seekAnimation && (
             <motion.div
@@ -326,12 +324,7 @@ export default function VideoPlayer({
               transition={{ duration: 0.2 }}
               className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
             >
-              <Button
-                onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                size="icon"
-                variant="ghost"
-                className="h-16 w-16 bg-black/50 rounded-full pointer-events-auto"
-              >
+              <Button onClick={(e) => { e.stopPropagation(); togglePlay(); }} size="icon" variant="ghost" className="h-16 w-16 bg-black/50 rounded-full pointer-events-auto">
                 <Play className="h-8 w-8 text-white" />
               </Button>
             </motion.div>
@@ -357,9 +350,9 @@ export default function VideoPlayer({
               <div className="bg-gradient-to-t from-black/70 to-transparent p-3 md:p-4 pointer-events-auto">
                 <div
                   ref={progressRef}
-                  className="relative group/progress"
+                  className="relative group/progress py-2" // Add padding to make hover area larger
                   onMouseMove={handleProgressHover}
-                  onMouseLeave={() => setThumbnail(null)}
+                  onMouseLeave={handleProgressLeave}
                 >
                   <Slider
                     value={[currentTime]}
@@ -367,15 +360,15 @@ export default function VideoPlayer({
                     step={0.1}
                     onValueChange={handleSliderChange}
                     onValueCommit={handleSliderCommit}
-                    className="w-full h-2 mb-2"
+                    className="w-full h-2"
                   />
                   {thumbnail && (
                     <div
                       className="absolute bottom-full mb-2 -translate-x-1/2 pointer-events-none"
                       style={{ left: `${thumbnail.left}px` }}
                     >
-                      <div className="relative bg-black border-2 border-white rounded-md w-40 h-[90px] overflow-hidden">
-                         <img src={thumbnail.src} className="w-full h-full object-cover" />
+                      <div className="relative bg-black border-2 border-white rounded-md w-40 h-[90px] overflow-hidden flex items-center justify-center">
+                         {thumbnail.src ? <img src={thumbnail.src} className="w-full h-full object-cover" /> : <Loader2 className="h-6 w-6 animate-spin text-white"/>}
                          <p className="absolute bottom-1 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
                            {formatTime(thumbnail.time)}
                          </p>
@@ -385,7 +378,7 @@ export default function VideoPlayer({
                 </div>
                 <div className="flex items-center justify-between text-white">
                   <div className="flex items-center gap-1 md:gap-2">
-                    <Tooltip><TooltipTrigger asChild><Button onClick={togglePlay} size="icon" variant="ghost">{isPlaying ? <Pause /> : <Play />}</Button></TooltipTrigger><TooltipContent>{isPlaying ? "Pausar" : "Reproduzir"}</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button onClick={togglePlay} size="icon" variant="ghost">{isPlaying ? <Pause /> : <Play />}</Button></TooltipTrigger><TooltipContent>{isPlaying ? "Pausar" : "Reproduzir"} (espaço)</TooltipContent></Tooltip>
                     <Tooltip><TooltipTrigger asChild><Button onClick={() => seek(-10)} size="icon" variant="ghost"><Rewind /></Button></TooltipTrigger><TooltipContent>-10s (←)</TooltipContent></Tooltip>
                     <Tooltip><TooltipTrigger asChild><Button onClick={() => seek(10)} size="icon" variant="ghost"><FastForward /></Button></TooltipTrigger><TooltipContent>+10s (→)</TooltipContent></Tooltip>
                     <span className="text-xs font-mono">{formatTime(currentTime)} / {formatTime(duration)}</span>
