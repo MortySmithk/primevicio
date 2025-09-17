@@ -272,7 +272,8 @@ export default function VideoPlayer({
     setThumbnail(null);
   };
   
-  const downloadUrl = `/download?${new URL(src).searchParams.toString()}`;
+  // CORREÇÃO: Usa uma abordagem mais segura para obter os searchParams
+  const downloadUrl = `/download?${new URL(src, window.location.origin).searchParams.toString()}`;
 
   return (
     <TooltipProvider delayDuration={150}>
