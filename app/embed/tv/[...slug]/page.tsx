@@ -3,9 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import VideoPlayer from '@/components/video-player';
-import { Loader2, Tv } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import NewVideoPlayer from '@/components/NewVideoPlayer';
+import { Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -34,7 +33,6 @@ export default function TvEmbedPage() {
 
   const [streams, setStreams] = useState<Stream[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [currentEpisodeDetails, setCurrentEpisodeDetails] = useState<Episode | null>(null);
 
   useEffect(() => {
     if (!tmdbId) return;
@@ -55,19 +53,13 @@ export default function TvEmbedPage() {
               throw new Error("OPS, ESTE TÍTULO ESTÁ SEM LINK, MANÉ! ESCOLHE OUTRO.");
             }
             setStreams(streamData.streams);
-
-            const seasonRes = await fetch(`${API_BASE_URL}/tv/${tmdbId}/season/${seasonNumber}?api_key=${API_KEY}&language=pt-BR`);
-            const seasonData = await seasonRes.json();
-            setEpisodes(seasonData.episodes || []);
-            const currentEp = seasonData.episodes?.find((e: Episode) => e.episode_number == parseInt(episodeNumber));
-            setCurrentEpisodeDetails(currentEp);
-
             setView('playing');
 
         } else {
           const firstSeason = detailsData.seasons.find((s: Season) => s.season_number > 0)?.season_number || 1;
-          setSelectedSeason(String(firstSeason));
-          const seasonRes = await fetch(`${API_BASE_URL}/tv/${tmdbId}/season/${firstSeason}?api_key=${API_KEY}&language=pt-BR`);
+          const seasonToFetch = seasonNumber || String(firstSeason);
+          setSelectedSeason(seasonToFetch);
+          const seasonRes = await fetch(`${API_BASE_URL}/tv/${tmdbId}/season/${seasonToFetch}?api_key=${API_KEY}&language=pt-BR`);
           const seasonData = await seasonRes.json();
           setEpisodes(seasonData.episodes || []);
           setView('episode-selection');
@@ -96,15 +88,10 @@ export default function TvEmbedPage() {
     
     return (
       <main className="w-full h-full flex items-center justify-center bg-black">
-        <VideoPlayer 
+        <NewVideoPlayer 
           src={proxyUrl}
           title={`${tvDetails?.name || 'Player'} - S${seasonNumber}E${episodeNumber}`}
-          mediaType="tv"
-          tmdbId={tmdbId}
-          seasons={tvDetails?.seasons}
-          initialEpisodes={episodes}
-          currentSeason={parseInt(seasonNumber || '1')}
-          currentEpisode={parseInt(episodeNumber || '1')}
+          onShowOptions={() => router.push(`/embed/tv/${tmdbId}/${seasonNumber}`)}
         />
       </main>
     );

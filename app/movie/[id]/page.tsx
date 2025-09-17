@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { Star, Calendar, Clock, PlayCircle, Clapperboard, Heart } from 'lucide-react'
-import VideoPlayer from "@/components/video-player"
+import NewVideoPlayer from '@/components/NewVideoPlayer'
 import { Button } from "@/components/ui/button"
 import { useFavorites, type FavoriteItem } from "@/components/favorites-context"
 import { cn } from "@/lib/utils"
@@ -112,11 +112,10 @@ function MovieDetailInner({ id }: { id: string }) {
       {selectedStream && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4">
           <div className="w-full max-w-6xl">
-              <VideoPlayer 
+              <NewVideoPlayer 
                   src={getProxyVideoUrl(selectedStream)} 
                   title={`${movie.title} - ${selectedStream.description}`} 
                   onClose={() => setSelectedStream(null)} 
-                  mediaType="movie"
                   onShowOptions={() => setSelectedStream(null)}
               />
           </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import VideoPlayer from '@/components/video-player';
+import NewVideoPlayer from '@/components/NewVideoPlayer';
 import { Loader2, Tv } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -76,11 +76,10 @@ export default function MovieEmbedPage() {
   if (selectedStream) {
     return (
       <main className="w-full h-full flex items-center justify-center bg-black">
-        <VideoPlayer 
+        <NewVideoPlayer 
           src={getProxyVideoUrl(selectedStream)} 
           title={movie?.title || 'Player'}
           onShowOptions={() => setSelectedStream(null)}
-          mediaType="movie"
         />
       </main>
     );
