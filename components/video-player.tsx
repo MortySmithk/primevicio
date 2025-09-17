@@ -272,11 +272,7 @@ export default function VideoPlayer({
     setThumbnail(null);
   };
   
-  const handleDownload = () => {
-    const params = new URL(src).searchParams.toString();
-    const downloadPageUrl = `/download?${params}`;
-    window.open(downloadPageUrl, '_blank');
-  };
+  const downloadUrl = `/download?${new URL(src).searchParams.toString()}`;
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -424,7 +420,17 @@ export default function VideoPlayer({
                     <span className="text-xs font-mono">{formatTime(currentTime)} / {formatTime(duration)}</span>
                   </div>
                   <div className="flex items-center gap-1 md:gap-2">
-                    <Tooltip><TooltipTrigger asChild><Button onClick={handleDownload} size="icon" variant="ghost" className="text-yellow-400"><Download /></Button></TooltipTrigger><TooltipContent>Baixar</TooltipContent></Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        {/* Ação alterada para usar âncora */}
+                        <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="h-10 w-10 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground">
+                          <Button size="icon" variant="ghost" className="text-yellow-400">
+                            <Download />
+                          </Button>
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>Baixar</TooltipContent>
+                    </Tooltip>
                     <Tooltip><TooltipTrigger asChild><Button onClick={toggleFullscreen} size="icon" variant="ghost">{isFullscreen ? <Minimize /> : <Maximize />}</Button></TooltipTrigger><TooltipContent>Tela Cheia (f)</TooltipContent></Tooltip>
                   </div>
                 </div>
