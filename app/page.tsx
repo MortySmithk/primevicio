@@ -61,7 +61,7 @@ export function MediaCard({ item }: { item: MediaItem }) {
       <div className="absolute inset-0 flex flex-col justify-end rounded-lg bg-black/70 p-3 opacity-0 transition-opacity duration-300 group-hover/card:opacity-100">
         <h3 className="line-clamp-2 text-sm font-semibold text-zinc-100">{item.title}</h3>
         <div className="mt-2 space-y-1.5">
-            <button onClick={handleOpenEmbed} className="flex w-full items-center justify-center rounded bg-red-600/80 py-1 text-xs font-semibold text-white hover:bg-red-600">Abrir Embed <ExternalLink className="ml-1.5 h-3 w-3" /></button>
+            {item.media_type === 'movie' && <button onClick={handleOpenEmbed} className="flex w-full items-center justify-center rounded bg-red-600/80 py-1 text-xs font-semibold text-white hover:bg-red-600">Abrir Embed <ExternalLink className="ml-1.5 h-3 w-3" /></button>}
             <button onClick={() => copyToClipboard(String(item.id), 'TMDb ID')} className="w-full rounded bg-white/10 py-1 text-xs text-white hover:bg-white/20">Copiar TMDb</button>
             <button onClick={() => copyToClipboard(`/${item.media_type}/${item.id}`, 'Link')} className="w-full rounded bg-white/10 py-1 text-xs text-white hover:bg-white/20">Copiar Link</button>
             <button onClick={() => copyToClipboard(item.title, 'Nome')} className="w-full rounded bg-white/10 py-1 text-xs text-white hover:bg-white/20">Copiar Nome</button>
@@ -323,7 +323,7 @@ function HomeInner({
       <main className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-20">
         <div className="mb-8 flex flex-wrap items-center justify-center gap-2">
           <button onClick={() => handleGenreSelect(null)} className={cn("rounded-md border border-white/15 px-3 py-1 text-sm transition-colors", selectedGenre === null ? "bg-white text-black" : "bg-white/5 text-zinc-100 hover:bg-white/10")}>Todos</button>
-          {genres.map((g) => ( <button key={g.id} onClick={() => handleGenreSelect(g.id)} className={cn("rounded-md border border-white/15 px-3 py-1 text-sm transition-colors", selectedGenre === g.id ? "bg-white text-black" : "bg-white/5 text-zinc-100 hover:bg-white/10")}>{g.name}</button> ))}
+          {genres.map((g) => ( <button key={g.id} onClick={() => handleGenreSelect(g.id)} className={cn("rounded-md border border-white/15 px-3 py-1 text-sm transition-colors", selectedGenre === g.id ? "bg-white text-black" : "bg-white/5 text-zinc-100 hover:bg-white/10")}>{g.name}</button>))}
         </div>
 
         <AnimatePresence mode="wait">

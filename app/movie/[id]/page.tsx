@@ -11,12 +11,13 @@ import { cn } from "@/lib/utils"
 const API_KEY = "001bbf841bab48f314947688a8230535"
 
 type MovieDetails = { id: number; title: string; overview: string; poster_path: string | null; backdrop_path: string | null; release_date: string; vote_average: number; runtime: number; };
-type Stream = { url: string; name: string; description: string; proxyHeaders?: any; spriteUrl?: string; playerType: 'custom' | 'abyss'; };
+type Stream = { url: string; name: string; description: string; playerType: 'abyss'; };
 
 const API_BASE_URL = "https://api.themoviedb.org/3";
 
 function MovieDetailInner({ id }: { id: string }) {
   const [movie, setMovie] = useState<MovieDetails | null>(null);
+  const [stream, setStream] = useState<Stream | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toggle, isFavorite } = useFavorites();
@@ -27,10 +28,24 @@ function MovieDetailInner({ id }: { id: string }) {
       try {
         setLoading(true);
         setError(null);
+        // Fetch movie details from TMDB
         const res = await fetch(`${API_BASE_URL}/movie/${id}?api_key=${API_KEY}&language=pt-BR&append_to_response=credits,videos`);
         if (!res.ok) throw new Error("Falha ao buscar os detalhes do filme.");
         const data = await res.json();
         setMovie(data);
+
+        // Fetch stream from our API
+        const streamRes = await fetch(`/api/stream/movies/${id}`);
+        if(streamRes.ok) {
+            const streamData = await streamRes.json();
+            if(streamData.streams && streamData.streams.length > 0) {
+                const abyssStream = streamData.streams.find((s: Stream) => s.playerType === 'abyss');
+                if (abyssStream) {
+                    setStream(abyssStream);
+                }
+            }
+        }
+
       } catch (e: any) {
         setError(e?.message || "Erro ao carregar conteúdo.");
       } finally {
@@ -71,7 +86,15 @@ function MovieDetailInner({ id }: { id: string }) {
                   <span className="inline-flex items-center gap-2 rounded-full bg-yellow-400/10 px-3 py-1 text-sm ring-1 ring-yellow-400/20 text-yellow-200"><Star className="h-4 w-4" fill="currentColor" />{movie.vote_average.toFixed(1)}</span>
               </div>
               <div className="mt-6 flex flex-wrap gap-3">
-                  <Link href={`/embed/movie/${movie.id}`} target="_blank" className={cn(buttonVariants({ size: "default" }), "bg-red-600 text-white hover:bg-red-600/90")}><PlayCircle className="mr-2 h-5 w-5" />Assistir agora</Link>
+                  {stream ? (
+                    <Link href={stream.url} target="_blank" className={cn(buttonVariants({ size: "default" }), "bg-red-600 text-white hover:bg-red-600/90")}>
+                        <PlayCircle className="mr-2 h-5 w-5" />Servidor Principal
+                    </Link>
+                  ) : (
+                    <Button disabled className={cn(buttonVariants({ size: "default" }), "bg-gray-600 text-white")}>
+                        <PlayCircle className="mr-2 h-5 w-5" />Indisponível
+                    </Button>
+                  )}
                   <Button onClick={() => toggle(favData)} variant="outline" className={cn("rounded-md", fav ? "bg-red-600/20 border-red-500/30 text-red-300" : "border-white/20 bg-white/5 text-white")}><Heart className={cn("mr-2 h-4 w-4", fav && "fill-current")} />{fav ? "Favorito" : "Favoritar"}</Button>
               </div>
               <div className="mt-6"><h2 className="mb-2 text-base font-semibold text-zinc-100">Sinopse</h2><p className="text-zinc-300">{movie.overview || "Sinopse não disponível."}</p></div>

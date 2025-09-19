@@ -16,6 +16,8 @@ const API_BASE_URL = "https://api.themoviedb.org/3";
 // --- TIPOS ---
 type TVDetails = { id: number; name: string; overview: string; poster_path: string | null; backdrop_path: string | null; first_air_date: string; vote_average: number; number_of_seasons: number; seasons: { id: number; name: string; season_number: number; episode_count: number }[]; };
 type Episode = { id: number; name: string; episode_number: number; overview: string; still_path: string | null; };
+type Stream = { url: string; name: string; description: string; playerType: 'abyss'; };
+
 
 function TVDetailInner({ id }: { id: string }) {
   const [tv, setTv] = useState<TVDetails | null>(null);
@@ -25,7 +27,8 @@ function TVDetailInner({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const { toggle, isFavorite } = useFavorites();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
-  const [iframeUrl, setIframeUrl] = useState<string>("");
+  const [stream, setStream] = useState<Stream | null>(null);
+  const [playerVisible, setPlayerVisible] = useState(false);
 
   // --- Busca Detalhes da Série ---
   useEffect(() => {
@@ -60,27 +63,37 @@ function TVDetailInner({ id }: { id: string }) {
         if (!res.ok) throw new Error("Falha ao buscar os episódios.");
         const data = await res.json();
         setEpisodes(data.episodes);
-        // Define o primeiro episódio da lista como padrão e atualiza o iframe
         if (data.episodes.length > 0) {
-            const firstEpisode = data.episodes[0];
-            setSelectedEpisode(firstEpisode);
-            setIframeUrl(`https://ultraembed.fun/serie/${id}/${selectedSeason}/${firstEpisode.episode_number}`);
-        } else {
-            setIframeUrl(""); // Limpa o iframe se não houver episódios
+            setSelectedEpisode(data.episodes[0]);
         }
       } catch (err) {
         setEpisodes([]);
-        setIframeUrl("");
       }
     };
     fetchSeasonDetails();
   }, [tv, selectedSeason, id]);
-
-  const handleEpisodeClick = (ep: Episode) => {
-    setSelectedEpisode(ep);
-    setIframeUrl(`https://ultraembed.fun/serie/${id}/${selectedSeason}/${ep.episode_number}`);
-  };
   
+  const handleEpisodeClick = async (ep: Episode) => {
+    setSelectedEpisode(ep);
+    setStream(null); // Reset stream
+    setPlayerVisible(false); // Hide player while loading new stream
+    try {
+        const streamRes = await fetch(`/api/stream/series/${id}/${selectedSeason}/${ep.episode_number}`);
+        if(streamRes.ok) {
+            const streamData = await streamRes.json();
+            if(streamData.streams && streamData.streams.length > 0) {
+                const abyssStream = streamData.streams.find((s: Stream) => s.playerType === 'abyss');
+                if(abyssStream) {
+                    setStream(abyssStream);
+                    setPlayerVisible(true);
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Error fetching episode stream", e);
+    }
+  };
+
   if (loading) return null;
   if (error || !tv) return ( <div className="bg-black text-white min-h-screen flex flex-col items-center justify-center pt-24"><p className="text-red-500">{error || "Série não encontrada"}</p></div>)
 
@@ -89,20 +102,34 @@ function TVDetailInner({ id }: { id: string }) {
 
   return (
     <div className="bg-zinc-950 min-h-screen text-white">
-        <div className="relative w-full h-[56.25vw] max-h-[80vh] bg-black">
-          {iframeUrl ? (
-              <iframe
-                  key={iframeUrl}
-                  src={iframeUrl}
-                  allowFullScreen
-                  className="w-full h-full border-0"
-              ></iframe>
-          ) : (
-              <div className="w-full h-full flex items-center justify-center bg-zinc-900">
-                  <Loader2 className="w-12 h-12 animate-spin text-zinc-600"/>
-              </div>
-          )}
-        </div>
+        {playerVisible && stream ? (
+             <div className="relative w-full h-[56.25vw] max-h-[80vh] bg-black">
+                <iframe
+                    key={stream.url}
+                    src={stream.url}
+                    allowFullScreen
+                    className="w-full h-full border-0"
+                ></iframe>
+            </div>
+        ) : (
+            <div 
+                className="relative w-full h-[56.25vw] max-h-[80vh] bg-cover bg-center"
+                style={{backgroundImage: `url(https://image.tmdb.org/t/p/original/${tv.backdrop_path})`}}
+            >
+                <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                    <div className="text-center">
+                        <h2 className="text-2xl font-bold mb-4">Selecione uma Temporada</h2>
+                        <Select onValueChange={(value) => setSelectedSeason(Number(value))} defaultValue={String(selectedSeason)}>
+                            <SelectTrigger className="w-[280px] bg-zinc-800 border-zinc-700 mx-auto"><SelectValue /></SelectTrigger>
+                            <SelectContent className="bg-zinc-900 text-white border-zinc-700">
+                                {tv.seasons.filter((s) => s.season_number > 0 && s.episode_count > 0).map((season) => (<SelectItem key={season.id} value={String(season.season_number)}>{season.name}</SelectItem>))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+            </div>
+        )}
+       
 
         <main className="container mx-auto px-4 md:px-8 py-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -124,12 +151,6 @@ function TVDetailInner({ id }: { id: string }) {
                 <div className="lg:col-span-2">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-2xl font-bold">Episódios</h2>
-                        <Select onValueChange={(value) => setSelectedSeason(Number(value))} defaultValue={String(selectedSeason)}>
-                            <SelectTrigger className="w-[220px] bg-zinc-900 border-zinc-800"><SelectValue /></SelectTrigger>
-                            <SelectContent className="bg-zinc-900 text-white border-zinc-700">
-                                {tv.seasons.filter((s) => s.season_number > 0 && s.episode_count > 0).map((season) => (<SelectItem key={season.id} value={String(season.season_number)}>{season.name}</SelectItem>))}
-                            </SelectContent>
-                        </Select>
                     </div>
                     <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2 scrollbar-clean">
                         {episodes.map((ep) => (
