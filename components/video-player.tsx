@@ -26,6 +26,7 @@ type VideoPlayerProps = {
   initialEpisodes?: Episode[];
   currentSeason?: number;
   currentEpisode?: number;
+  thumbnailSpriteSrc?: string; // Adicionado para sprites
 };
 
 export default function VideoPlayer({
@@ -36,6 +37,7 @@ export default function VideoPlayer({
   tmdbId,
   currentSeason,
   currentEpisode,
+  thumbnailSpriteSrc
 }: VideoPlayerProps) {
   const isMobile = useIsMobile();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -60,7 +62,7 @@ export default function VideoPlayer({
 
   // Inicializa o vídeo temporário para thumbnails quando o player principal carregar
   useEffect(() => {
-    if (videoRef.current && !tempVideoRef.current) {
+    if (videoRef.current && !tempVideoRef.current && !thumbnailSpriteSrc) {
         const tempVideo = document.createElement('video');
         tempVideo.src = videoRef.current.src;
         tempVideo.crossOrigin = "anonymous";
@@ -70,7 +72,7 @@ export default function VideoPlayer({
         tempVideo.preload = 'auto';
         tempVideoRef.current = tempVideo;
     }
-  }, [src]);
+  }, [src, thumbnailSpriteSrc]);
 
   const formatTime = (seconds: number) => {
     const date = new Date(seconds * 1000);
@@ -91,7 +93,7 @@ export default function VideoPlayer({
           }
       }
   }, [isSeeking, showLogo]);
-  
+
   const handlePlay = useCallback(() => setIsPlaying(true), []);
   const handlePause = useCallback(() => setIsPlaying(false), []);
 
@@ -147,14 +149,14 @@ export default function VideoPlayer({
     }
     setIsSeeking(false);
   };
-  
+
   const triggerSeekAnimation = (direction: "forward" | "rewind") => {
     setSeekAnimation(direction);
     setTimeout(() => setSeekAnimation(null), 600);
   };
 
   const togglePlay = () => videoRef.current?.paused ? videoRef.current?.play() : videoRef.current?.pause();
-  
+
   const seek = useCallback((amount: number) => {
     if (videoRef.current) {
         videoRef.current.currentTime += amount;
@@ -192,7 +194,7 @@ export default function VideoPlayer({
     if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
       const rect = e.currentTarget.getBoundingClientRect();
       const touchX = e.touches[0].clientX - rect.left;
-      
+
       if (touchX < rect.width / 2) {
         seek(-10);
       } else {
@@ -203,7 +205,7 @@ export default function VideoPlayer({
     }
     lastTap.current = now;
   };
-  
+
   const handleAreaClick = () => {
     if (!isMobile) togglePlay();
   };
@@ -220,7 +222,7 @@ export default function VideoPlayer({
       };
       window.addEventListener("keydown", handleKeyDown);
       return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [seek, togglePlay, toggleFullscreen]);
+  }, [seek, toggleFullscreen]);
 
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -256,9 +258,21 @@ export default function VideoPlayer({
     const percentage = Math.max(0, Math.min(1, x / rect.width));
     const time = duration * percentage;
 
+    // Se tivermos um spritesheet, não precisamos gerar thumbs
+    if(thumbnailSpriteSrc) {
+        // Lógica para calcular a posição do background no sprite
+        const SPRITE_INTERVAL = 10; // Supondo que cada frame do sprite é a cada 10s
+        const THUMBNAIL_WIDTH = 160;
+        const index = Math.floor(time / SPRITE_INTERVAL);
+        const bgPosition = `-${index * THUMBNAIL_WIDTH}px 0px`;
+        setThumbnail({ src: bgPosition, time, left: x });
+        return;
+    }
+
+
     // Atualiza a posição da caixa da miniatura imediatamente
     setThumbnail(prev => ({ src: prev?.src || '', time, left: x }));
-    
+
     // Usa debounce para evitar gerar miniaturas excessivamente
     if (thumbnailDebounceRef.current) {
         clearTimeout(thumbnailDebounceRef.current);
@@ -275,10 +289,10 @@ export default function VideoPlayer({
     if (thumbnailDebounceRef.current) clearTimeout(thumbnailDebounceRef.current);
     setThumbnail(null);
   };
-  
+
   // CORREÇÃO: Usa uma abordagem mais segura para obter os searchParams
   const downloadParams = new URL(src, window.location.origin).searchParams.toString();
-  
+
   const formattedTitle = title.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-');
   let filename = `${formattedTitle}-Prime-Vicio`;
 
@@ -287,7 +301,7 @@ export default function VideoPlayer({
   } else if (mediaType === "movie") {
       filename = `${formattedTitle}-Prime-Vicio`;
   }
-  
+
   const downloadUrl = `/download?${downloadParams}&filename=${encodeURIComponent(filename)}`;
 
   return (
@@ -332,7 +346,7 @@ export default function VideoPlayer({
           onPlaying={() => setIsLoading(false)}
           crossOrigin="anonymous"
         />
-        
+
         <AnimatePresence>
           {seekAnimation && (
             <motion.div
@@ -420,7 +434,13 @@ export default function VideoPlayer({
                       style={{ left: `${thumbnail.left}px` }}
                     >
                       <div className="relative bg-black border-2 border-white rounded-md w-40 h-[90px] overflow-hidden flex items-center justify-center">
-                         {thumbnail.src ? <img src={thumbnail.src} className="w-full h-full object-cover" /> : <Loader2 className="h-6 w-6 animate-spin text-white"/>}
+                         {thumbnailSpriteSrc ? (
+                            <div className="w-full h-full" style={{ backgroundImage: `url(${thumbnailSpriteSrc})`, backgroundPosition: thumbnail.src }}/>
+                         ) : thumbnail.src ? (
+                            <img src={thumbnail.src} className="w-full h-full object-cover" />
+                         ) : (
+                            <Loader2 className="h-6 w-6 animate-spin text-white"/>
+                         )}
                          <p className="absolute bottom-1 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
                            {formatTime(thumbnail.time)}
                          </p>

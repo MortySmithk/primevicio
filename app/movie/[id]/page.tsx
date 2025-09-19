@@ -3,26 +3,22 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Star, Calendar, Clock, PlayCircle, Clapperboard, Heart } from 'lucide-react'
-import VideoPlayer from '@/components/video-player'
+import { Star, Calendar, Clock, PlayCircle, Heart } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { useFavorites, type FavoriteItem } from "@/components/favorites-context"
 import { cn } from "@/lib/utils"
 
-const API_KEY = "001bbf841bab48f314947688a8230535" 
+const API_KEY = "001bbf841bab48f314947688a8230535"
 
 type MovieDetails = { id: number; title: string; overview: string; poster_path: string | null; backdrop_path: string | null; release_date: string; vote_average: number; runtime: number; };
-// Tipagem do Stream atualizada para incluir a URL do spritesheet
-type Stream = { url: string; name: string; description: string; proxyHeaders?: any; spriteUrl?: string; };
+type Stream = { url: string; name: string; description: string; proxyHeaders?: any; spriteUrl?: string; playerType: 'custom' | 'abyss'; };
 
 const API_BASE_URL = "https://api.themoviedb.org/3";
 
 function MovieDetailInner({ id }: { id: string }) {
   const [movie, setMovie] = useState<MovieDetails | null>(null);
-  const [streams, setStreams] = useState<Stream[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedStream, setSelectedStream] = useState<Stream | null>(null);
   const { toggle, isFavorite } = useFavorites();
 
   useEffect(() => {
@@ -35,12 +31,6 @@ function MovieDetailInner({ id }: { id: string }) {
         if (!res.ok) throw new Error("Falha ao buscar os detalhes do filme.");
         const data = await res.json();
         setMovie(data);
-
-        const sRes = await fetch(`/api/stream/movies/${id}`);
-        if (sRes.ok) {
-          const sData = await sRes.json();
-          setStreams(sData.streams || []);
-        }
       } catch (e: any) {
         setError(e?.message || "Erro ao carregar conteúdo.");
       } finally {
@@ -52,16 +42,7 @@ function MovieDetailInner({ id }: { id: string }) {
 
   const formatRuntime = (minutes: number) => { const h = Math.floor(minutes / 60); const m = minutes % 60; return `${h}h ${m}m`; };
 
-  const getProxyVideoUrl = (stream: Stream) => {
-    const p = new URLSearchParams();
-    p.append("videoUrl", stream.url);
-    if (stream.proxyHeaders) {
-      p.append("headers", encodeURIComponent(JSON.stringify(stream.proxyHeaders.request || stream.proxyHeaders)));
-    }
-    return `/api/video-proxy?${p.toString()}`;
-  };
-
-  if (loading) return null 
+  if (loading) return null
   if (error) return ( <div className="bg-black text-white min-h-screen flex flex-col items-center justify-center pt-24"><p className="text-red-500">{error}</p></div>)
   if (!movie) return null
 
@@ -97,36 +78,7 @@ function MovieDetailInner({ id }: { id: string }) {
           </div>
         </section>
 
-        {streams.length > 0 && 
-          <section className="mt-12">
-            <h2 className="text-2xl font-bold mb-3">Servidores</h2>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {streams.map((s, i) => (
-                  <Button key={i} variant="secondary" onClick={() => setSelectedStream(s)} className="justify-start h-auto py-3">
-                    <Clapperboard className="h-4 w-4 mr-2 text-red-500" />
-                    <div className="text-left"><h3 className="text-sm font-semibold text-zinc-100">{s.description}</h3><p className="text-xs text-zinc-400">{s.name}</p></div>
-                  </Button>
-                ))}
-            </div>
-          </section>
-        }
       </main>
-      
-      {selectedStream && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4">
-          <div className="w-full max-w-6xl">
-              <VideoPlayer 
-                  src={getProxyVideoUrl(selectedStream)} 
-                  title={`${movie.title} - ${selectedStream.description}`} 
-                  onShowOptions={() => setSelectedStream(null)}
-                  mediaType="movie"
-                  tmdbId={id}
-                  // 👇 PROP ADICIONADA AQUI 👇
-                  thumbnailSpriteSrc={selectedStream.spriteUrl}
-              />
-          </div>
-        </motion.div>
-      )}
     </div>
   );
 }
