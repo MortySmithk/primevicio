@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
+import { firestore } from "@/lib/firebase"; // Corrigido para firestore
 import { collection, getDocs, query, where } from "firebase/firestore";
 
 export async function GET(request: Request, { params }: { params: { tmdbId: string } }) {
@@ -10,14 +10,16 @@ export async function GET(request: Request, { params }: { params: { tmdbId: stri
   }
 
   try {
-    const streamsQuery = query(collection(db, "streams"), where("tmdbId", "==", tmdbId), where("playerType", "==", "abyss"), where("media_type", "==", "movie"));
+    const streamsQuery = query(collection(firestore, "streams"), where("tmdbId", "==", tmdbId), where("media_type", "==", "movie"));
     const streamsSnapshot = await getDocs(streamsQuery);
     
     if (streamsSnapshot.empty) {
         return NextResponse.json({ streams: [] });
     }
 
-    const streams = streamsSnapshot.docs.map(doc => doc.data());
+    const streams = streamsSnapshot.docs
+      .map(doc => doc.data())
+      .filter(stream => stream.url && stream.url.includes("short.icu"));
 
     return NextResponse.json({ streams });
   } catch (error) {

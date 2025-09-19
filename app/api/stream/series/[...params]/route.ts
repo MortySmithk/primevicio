@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
+import { firestore } from "@/lib/firebase"; // Corrigido para firestore
 import { collection, getDocs, query, where } from "firebase/firestore";
 
 export async function GET(request: Request, { params }: { params: { params: string[] } }) {
@@ -10,11 +10,20 @@ export async function GET(request: Request, { params }: { params: { params: stri
   }
 
   try {
+    // Primeiro, encontramos o ID do documento da série com base no tmdbId
+    const seriesQuery = query(collection(firestore, "streams"), where("tmdbId", "==", tmdbId), where("media_type", "==", "tv"));
+    const seriesSnapshot = await getDocs(seriesQuery);
+
+    if (seriesSnapshot.empty) {
+      return NextResponse.json({ streams: [] });
+    }
+    const seriesDocId = seriesSnapshot.docs[0].id;
+
+    // Agora, buscamos o episódio dentro da subcoleção da série
     const episodeQuery = query(
-      collection(db, `streams/${tmdbId}/episodes`),
+      collection(firestore, `streams/${seriesDocId}/episodes`),
       where("season", "==", parseInt(season)),
-      where("episode", "==", parseInt(episode)),
-      where("playerType", "==", "abyss")
+      where("episode", "==", parseInt(episode))
     );
     const episodeSnapshot = await getDocs(episodeQuery);
 
@@ -22,7 +31,9 @@ export async function GET(request: Request, { params }: { params: { params: stri
         return NextResponse.json({ streams: [] });
     }
 
-    const streams = episodeSnapshot.docs.map(doc => doc.data());
+    const streams = episodeSnapshot.docs
+      .map(doc => doc.data())
+      .filter(stream => stream.url && stream.url.includes("short.icu"));
 
     return NextResponse.json({ streams });
   } catch (error) {
