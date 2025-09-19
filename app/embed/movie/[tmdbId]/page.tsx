@@ -10,14 +10,14 @@ export default function MovieEmbedPage() {
 
   if (!tmdbId) {
     return (
-      <main className="w-full h-full flex items-center justify-center bg-black">
+      <main className="w-screen h-screen flex items-center justify-center bg-black">
         <Loader2 className="w-12 h-12 animate-spin text-white" />
       </main>
     );
   }
 
   return (
-    <main className="w-full h-full flex items-center justify-center bg-black">
+    <main className="w-screen h-screen flex items-center justify-center bg-black">
       <iframe
         src={`https://ultraembed.fun/filme/${tmdbId}`}
         allowFullScreen

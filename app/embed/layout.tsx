@@ -10,8 +10,8 @@ export const metadata = {
 
 export default function EmbedLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className="h-full">
-      <body className="h-full bg-black">{children}</body>
+    <html lang="pt-BR" className="h-screen">
+      <body className="h-screen bg-black">{children}</body>
     </html>
   );
 }
