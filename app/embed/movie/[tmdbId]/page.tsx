@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import VideoPlayer from '@/components/video-player';
-import { Loader2, Tv } from 'lucide-react';
+import { Loader2, Tv, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const API_KEY = "001bbf841bab48f314947688a8230535";
@@ -104,8 +104,12 @@ export default function MovieEmbedPage() {
         <p className="text-zinc-400 mb-6">Selecione um servidor para assistir</p>
         <div className="mt-4 space-y-2">
             {streams.map((stream, index) => (
-              <Button key={index} onClick={() => setSelectedStream(stream)} className="w-full h-12 bg-zinc-800/60 hover:bg-zinc-700/80 text-white font-semibold flex items-center justify-center gap-2">
-                <Tv className="w-5 h-5" /> {stream.name || 'Servidor'}
+              <Button key={index} onClick={() => setSelectedStream(stream)} className="w-full h-14 bg-zinc-800/60 hover:bg-zinc-700/80 text-white font-semibold flex flex-col items-center justify-center gap-1 text-left p-2">
+                <div className="flex items-center gap-2">
+                    {stream.playerType === 'abyss' ? <ShieldAlert className="w-5 h-5 text-yellow-400" /> : <Tv className="w-5 h-5" />}
+                    <span>{stream.name || 'Servidor'}</span>
+                </div>
+                {stream.playerType === 'abyss' && <span className="text-xs font-normal text-yellow-500">(pode conter anúncios)</span>}
               </Button>
             ))}
         </div>
