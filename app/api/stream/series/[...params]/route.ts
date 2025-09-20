@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { firestore } from "@/lib/firebase"; // Corrigido para firestore
+import { firestore } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 
 export async function GET(request: Request, { params }: { params: { params: string[] } }) {
@@ -10,8 +10,18 @@ export async function GET(request: Request, { params }: { params: { params: stri
   }
 
   try {
+    // FIX: Convert tmdbId from string to number
+    const tmdbIdAsNumber = parseInt(tmdbId, 10);
+    if (isNaN(tmdbIdAsNumber)) {
+        return NextResponse.json({ error: "TMDB ID inválido." }, { status: 400 });
+    }
+
     // Primeiro, encontramos o ID do documento da série com base no tmdbId
-    const seriesQuery = query(collection(firestore, "streams"), where("tmdbId", "==", tmdbId), where("media_type", "==", "tv"));
+    const seriesQuery = query(
+        collection(firestore, "streams"), 
+        where("tmdbId", "==", tmdbIdAsNumber), 
+        where("media_type", "==", "tv")
+    );
     const seriesSnapshot = await getDocs(seriesQuery);
 
     if (seriesSnapshot.empty) {

@@ -1,52 +1,67 @@
 import { NextResponse } from "next/server";
-import { firestore } from "@/lib/firebase"; // Corrigido para firestore
-import { collection, getDocs, query, where, documentId } from "firebase/firestore";
+import { firestore } from "@/lib/firebase";
+import { collection, getDocs, query, where } from "firebase/firestore";
+
+export const revalidate = 60; // Cache the result for 60 seconds
 
 export async function GET() {
   try {
-    // --- Contagem de Filmes ---
-    const moviesCollection = collection(firestore, "streams");
-    const moviesQuery = query(moviesCollection, where("media_type", "==", "movie"));
-    const moviesSnapshot = await getDocs(moviesQuery);
-    const abyssMovies = moviesSnapshot.docs.filter(doc => {
-        const data = doc.data();
-        return data.url && data.url.includes("short.icu");
-    });
-    const moviesCount = abyssMovies.length;
+    const streamsCollection = collection(firestore, "streams");
 
-    // --- Contagem de Séries ---
-    const seriesCollection = collection(firestore, "streams");
-    const seriesQuery = query(seriesCollection, where("media_type", "==", "tv"));
+    // --- Contagem de Filmes ---
+    const moviesQuery = query(
+      streamsCollection,
+      where("media_type", "==", "movie"),
+      where("url", ">=", "https://short.icu"),
+      where("url", "<=", "https://short.icu" + '\uf8ff')
+    );
+    const moviesSnapshot = await getDocs(moviesQuery);
+    // Double-check filter in code as Firestore `where` can be tricky with substrings
+    const moviesCount = moviesSnapshot.docs.filter(doc => doc.data().url?.includes("short.icu")).length;
+
+    // --- Contagem de Séries e Episódios (Otimizado) ---
+    const seriesQuery = query(streamsCollection, where("media_type", "==", "tv"));
     const seriesSnapshot = await getDocs(seriesQuery);
-    const seriesWithAbyssEpisodes = new Set<string>();
 
     let episodesCount = 0;
+    const seriesWithEpisodes = new Set<string>();
 
-    // Itera sobre cada documento de série para verificar os episódios
-    for (const seriesDoc of seriesSnapshot.docs) {
-        const episodesCollection = collection(firestore, `streams/${seriesDoc.id}/episodes`);
-        const episodesSnapshot = await getDocs(episodesCollection);
+    // Create a batch of promises to fetch all episode subcollections in parallel
+    const episodePromises = seriesSnapshot.docs.map(seriesDoc => {
+      const episodesCollection = collection(firestore, `streams/${seriesDoc.id}/episodes`);
+      // Query only for documents that have the 'url' field to narrow down results
+      const episodesQuery = query(episodesCollection, where("url", ">=", ""));
+      return getDocs(episodesQuery).then(episodeSnapshot => ({
+        seriesDocId: seriesDoc.id,
+        episodeSnapshot
+      }));
+    });
+    
+    const allEpisodeResults = await Promise.all(episodePromises);
 
-        const abyssEpisodes = episodesSnapshot.docs.filter(doc => {
-            const data = doc.data();
-            return data.url && data.url.includes("short.icu");
-        });
-        
-        if (abyssEpisodes.length > 0) {
-            seriesWithAbyssEpisodes.add(seriesDoc.id);
-            episodesCount += abyssEpisodes.length;
-        }
+    // Process the results after all promises have resolved
+    for (const { seriesDocId, episodeSnapshot } of allEpisodeResults) {
+      const validEpisodes = episodeSnapshot.docs.filter(doc => doc.data().url?.includes("short.icu"));
+      if (validEpisodes.length > 0) {
+        seriesWithEpisodes.add(seriesDocId);
+        episodesCount += validEpisodes.length;
+      }
     }
-    const seriesCount = seriesWithAbyssEpisodes.size;
-
 
     return NextResponse.json({
       movies: moviesCount,
-      series: seriesCount,
+      series: seriesWithEpisodes.size,
       episodes: episodesCount,
     });
+    
   } catch (error) {
     console.error("Error fetching stats:", error);
-    return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 });
+    // Return stale or zeroed data on error to prevent breaking the frontend
+    return NextResponse.json({ 
+        movies: 0, 
+        series: 0, 
+        episodes: 0, 
+        error: "Failed to fetch stats" 
+    }, { status: 500 });
   }
 }

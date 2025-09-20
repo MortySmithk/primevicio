@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { firestore } from "@/lib/firebase"; // Corrigido para firestore
+import { firestore } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 
 export async function GET(request: Request, { params }: { params: { tmdbId: string } }) {
@@ -10,7 +10,17 @@ export async function GET(request: Request, { params }: { params: { tmdbId: stri
   }
 
   try {
-    const streamsQuery = query(collection(firestore, "streams"), where("tmdbId", "==", tmdbId), where("media_type", "==", "movie"));
+    // FIX: Convert tmdbId from string to number for correct Firestore query
+    const tmdbIdAsNumber = parseInt(tmdbId, 10);
+    if (isNaN(tmdbIdAsNumber)) {
+        return NextResponse.json({ error: "TMDB ID inválido." }, { status: 400 });
+    }
+
+    const streamsQuery = query(
+        collection(firestore, "streams"), 
+        where("tmdbId", "==", tmdbIdAsNumber), 
+        where("media_type", "==", "movie")
+    );
     const streamsSnapshot = await getDocs(streamsQuery);
     
     if (streamsSnapshot.empty) {
