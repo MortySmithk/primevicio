@@ -18,14 +18,17 @@ export default function MovieEmbedPage() {
       return;
     };
 
-    const fetchStreamAndRedirect = async () => {
+    const fetchAndLoadPlayer = async () => {
         try {
             const res = await fetch(`/api/stream/movies/${tmdbId}`);
             if (res.ok) {
                 const data = await res.json();
-                if (data.streams && data.streams.length > 0 && data.streams[0].url) {
-                    // REDIRECIONA PARA O PLAYER
-                    window.location.href = data.streams[0].url;
+                const abyssStream = data.streams?.find((s: any) => s.playerType === 'abyss' && s.url);
+
+                if (abyssStream) {
+                    // CORREÇÃO: Redireciona para a página de player interna do seu site
+                    const playerPageUrl = `/player?url=${encodeURIComponent(abyssStream.url)}`;
+                    window.location.href = playerPageUrl;
                     return; 
                 }
                 setError("Nenhum link de streaming disponível para este filme.");
@@ -40,7 +43,7 @@ export default function MovieEmbedPage() {
         }
     };
 
-    fetchStreamAndRedirect();
+    fetchAndLoadPlayer();
   }, [tmdbId]);
 
   return (
