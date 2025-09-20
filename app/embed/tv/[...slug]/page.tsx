@@ -32,6 +32,8 @@ export default function TvEmbedPage() {
                     const abyssStream = data.streams[0]; // Pega o primeiro link da Abyss
                     if(abyssStream && abyssStream.url) {
                         setStreamUrl(abyssStream.url);
+                        // Redireciona diretamente para a URL do player
+                        window.location.href = abyssStream.url;
                         return;
                     }
                 }
@@ -49,10 +51,11 @@ export default function TvEmbedPage() {
     fetchStream();
   }, [tmdbId, seasonNumber, episodeNumber]);
 
-  if (loading) {
+  if (loading || streamUrl) {
     return (
-      <main className="w-screen h-screen flex items-center justify-center bg-black">
+      <main className="w-screen h-screen flex flex-col items-center justify-center bg-black text-white p-4">
         <Loader2 className="w-12 h-12 animate-spin text-white" />
+        {streamUrl && <p className="mt-4 text-zinc-400">Redirecionando para o player...</p>}
       </main>
     );
   }
@@ -67,16 +70,5 @@ export default function TvEmbedPage() {
     );
   }
   
-  if (streamUrl) {
-    return (
-        <iframe
-            src={streamUrl}
-            title="TV Show Player"
-            allowFullScreen
-            className="w-screen h-screen border-0"
-        />
-    )
-  }
-
   return null;
 }

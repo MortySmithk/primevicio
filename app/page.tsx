@@ -45,11 +45,6 @@ export function MediaCard({ item }: { item: MediaItem }) {
         });
     }
   };
-
-  const handleOpenEmbed = () => {
-    const url = `/embed/${item.media_type}/${item.id}`;
-    window.open(url, '_blank');
-  };
   
   return (
     <div className="group/card relative">
@@ -61,7 +56,15 @@ export function MediaCard({ item }: { item: MediaItem }) {
       <div className="absolute inset-0 flex flex-col justify-end rounded-lg bg-black/70 p-3 opacity-0 transition-opacity duration-300 group-hover/card:opacity-100">
         <h3 className="line-clamp-2 text-sm font-semibold text-zinc-100">{item.title}</h3>
         <div className="mt-2 space-y-1.5">
-            {item.media_type === 'movie' && <button onClick={handleOpenEmbed} className="flex w-full items-center justify-center rounded bg-red-600/80 py-1 text-xs font-semibold text-white hover:bg-red-600">Abrir Embed <ExternalLink className="ml-1.5 h-3 w-3" /></button>}
+            {item.media_type === 'movie' ? (
+              <Link href={`/embed/movie/${item.id}`} target="_blank" rel="noopener noreferrer" className="flex w-full items-center justify-center rounded bg-red-600/80 py-1 text-xs font-semibold text-white hover:bg-red-600">
+                Abrir Player <ExternalLink className="ml-1.5 h-3 w-3" />
+              </Link>
+            ) : (
+              <Link href={`/tv/${item.id}`} className="flex w-full items-center justify-center rounded bg-red-600/80 py-1 text-xs font-semibold text-white hover:bg-red-600">
+                Ver Episódios <ExternalLink className="ml-1.5 h-3 w-3" />
+              </Link>
+            )}
             <button onClick={() => copyToClipboard(String(item.id), 'TMDb ID')} className="w-full rounded bg-white/10 py-1 text-xs text-white hover:bg-white/20">Copiar TMDb</button>
             <button onClick={() => copyToClipboard(`/${item.media_type}/${item.id}`, 'Link')} className="w-full rounded bg-white/10 py-1 text-xs text-white hover:bg-white/20">Copiar Link</button>
             <button onClick={() => copyToClipboard(item.title, 'Nome')} className="w-full rounded bg-white/10 py-1 text-xs text-white hover:bg-white/20">Copiar Nome</button>
