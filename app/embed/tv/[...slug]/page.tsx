@@ -12,7 +12,6 @@ export default function TvEmbedPage() {
   const seasonNumber = slug?.[1];
   const episodeNumber = slug?.[2];
 
-  const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -23,52 +22,42 @@ export default function TvEmbedPage() {
         return;
     }
     
-    const fetchStream = async () => {
+    const fetchStreamAndRedirect = async () => {
         try {
             const res = await fetch(`/api/stream/series/${tmdbId}/${seasonNumber}/${episodeNumber}`);
             if (res.ok) {
                 const data = await res.json();
-                if (data.streams && data.streams.length > 0) {
-                    const abyssStream = data.streams[0]; // Pega o primeiro link da Abyss
-                    if(abyssStream && abyssStream.url) {
-                        setStreamUrl(abyssStream.url);
-                        // Redireciona diretamente para a URL do player
-                        window.location.href = abyssStream.url;
-                        return;
-                    }
+                if (data.streams && data.streams.length > 0 && data.streams[0].url) {
+                    // A MÁGICA ACONTECE AQUI: REDIRECIONA PARA O PLAYER DA ABYSS
+                    window.location.href = data.streams[0].url;
+                    return; // Interrompe a execução para não mostrar erro
                 }
-                setError("Nenhum link de streaming disponível para este episódio.");
+                setError("Nenhum link de streaming da Abyss disponível para este episódio.");
             } else {
-                setError("Falha ao buscar os links de streaming.");
+                setError("Falha ao buscar os links de streaming do nosso servidor.");
             }
         } catch (error) {
             console.error("Erro ao buscar a URL do stream", error);
             setError("Ocorreu um erro ao tentar carregar o episódio.");
         } finally {
+            // Se o redirecionamento não acontecer, paramos o loading para mostrar o erro.
             setLoading(false);
         }
     };
-    fetchStream();
+    fetchStreamAndRedirect();
   }, [tmdbId, seasonNumber, episodeNumber]);
 
-  if (loading || streamUrl) {
-    return (
-      <main className="w-screen h-screen flex flex-col items-center justify-center bg-black text-white p-4">
-        <Loader2 className="w-12 h-12 animate-spin text-white" />
-        {streamUrl && <p className="mt-4 text-zinc-400">Redirecionando para o player...</p>}
-      </main>
-    );
-  }
-
-  if (error) {
-     return (
-      <main className="w-screen h-screen flex flex-col items-center justify-center bg-black text-white p-4">
-        <Tv className="w-16 h-16 text-zinc-700 mb-4" />
-        <h2 className="text-xl font-bold mb-2">Erro ao Carregar</h2>
-        <p className="text-zinc-400 text-center">{error}</p>
-      </main>
-    );
-  }
-  
-  return null;
+  // Esta tela só será exibida se o redirecionamento falhar.
+  return (
+    <main className="w-screen h-screen flex flex-col items-center justify-center bg-black text-white p-4">
+    {loading && <Loader2 className="w-12 h-12 animate-spin text-white" />}
+    {error && (
+        <>
+            <Tv className="w-16 h-16 text-zinc-700 mb-4" />
+            <h2 className="text-xl font-bold mb-2">Erro ao Carregar</h2>
+            <p className="text-zinc-400 text-center">{error}</p>
+        </>
+    )}
+  </main>
+  );
 }
