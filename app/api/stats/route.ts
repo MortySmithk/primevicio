@@ -2,50 +2,46 @@ import { NextResponse } from "next/server";
 import { firestore } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 
-export const revalidate = 60; // Cache the result for 60 seconds
+// Remove caching to ensure fresh data on every request during debugging
+export const revalidate = 0;
 
 export async function GET() {
   try {
     const streamsCollection = collection(firestore, "streams");
+    const allStreamsSnapshot = await getDocs(streamsCollection);
 
-    // --- Contagem de Filmes ---
-    const moviesQuery = query(
-      streamsCollection,
-      where("media_type", "==", "movie"),
-      where("url", ">=", "https://short.icu"),
-      where("url", "<=", "https://short.icu" + '\uf8ff')
-    );
-    const moviesSnapshot = await getDocs(moviesQuery);
-    // Double-check filter in code as Firestore `where` can be tricky with substrings
-    const moviesCount = moviesSnapshot.docs.filter(doc => doc.data().url?.includes("short.icu")).length;
-
-    // --- Contagem de Séries e Episódios (Otimizado) ---
-    const seriesQuery = query(streamsCollection, where("media_type", "==", "tv"));
-    const seriesSnapshot = await getDocs(seriesQuery);
-
-    let episodesCount = 0;
+    let moviesCount = 0;
     const seriesWithEpisodes = new Set<string>();
+    let episodesCount = 0;
 
-    // Create a batch of promises to fetch all episode subcollections in parallel
-    const episodePromises = seriesSnapshot.docs.map(seriesDoc => {
-      const episodesCollection = collection(firestore, `streams/${seriesDoc.id}/episodes`);
-      // Query only for documents that have the 'url' field to narrow down results
-      const episodesQuery = query(episodesCollection, where("url", ">=", ""));
-      return getDocs(episodesQuery).then(episodeSnapshot => ({
-        seriesDocId: seriesDoc.id,
-        episodeSnapshot
-      }));
+    // --- Process Movies ---
+    const movieDocs = allStreamsSnapshot.docs.filter(doc => {
+        const data = doc.data();
+        return data.media_type === 'movie' && data.url?.includes("short.icu");
     });
-    
+    moviesCount = movieDocs.length;
+
+    // --- Process Series ---
+    const seriesDocs = allStreamsSnapshot.docs.filter(doc => doc.data().media_type === 'tv');
+
+    // Fetch all episode subcollections in parallel
+    const episodePromises = seriesDocs.map(seriesDoc => 
+        getDocs(collection(firestore, `streams/${seriesDoc.id}/episodes`))
+            .then(episodeSnapshot => ({
+                seriesDocId: seriesDoc.id,
+                episodeSnapshot
+            }))
+    );
+
     const allEpisodeResults = await Promise.all(episodePromises);
 
-    // Process the results after all promises have resolved
+    // Process results after all fetches are complete
     for (const { seriesDocId, episodeSnapshot } of allEpisodeResults) {
-      const validEpisodes = episodeSnapshot.docs.filter(doc => doc.data().url?.includes("short.icu"));
-      if (validEpisodes.length > 0) {
-        seriesWithEpisodes.add(seriesDocId);
-        episodesCount += validEpisodes.length;
-      }
+        const abyssEpisodes = episodeSnapshot.docs.filter(doc => doc.data().url?.includes("short.icu"));
+        if (abyssEpisodes.length > 0) {
+            seriesWithEpisodes.add(seriesDocId);
+            episodesCount += abyssEpisodes.length;
+        }
     }
 
     return NextResponse.json({
@@ -56,7 +52,6 @@ export async function GET() {
     
   } catch (error) {
     console.error("Error fetching stats:", error);
-    // Return stale or zeroed data on error to prevent breaking the frontend
     return NextResponse.json({ 
         movies: 0, 
         series: 0, 

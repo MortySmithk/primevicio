@@ -10,26 +10,20 @@ export async function GET(request: Request, { params }: { params: { params: stri
   }
 
   try {
-    // FIX: Convert tmdbId from string to number
-    const tmdbIdAsNumber = parseInt(tmdbId, 10);
-    if (isNaN(tmdbIdAsNumber)) {
-        return NextResponse.json({ error: "TMDB ID inválido." }, { status: 400 });
-    }
-
-    // Primeiro, encontramos o ID do documento da série com base no tmdbId
+    // FIX: Treat tmdbId as a string for the query.
     const seriesQuery = query(
         collection(firestore, "streams"), 
-        where("tmdbId", "==", tmdbIdAsNumber), 
+        where("tmdbId", "==", tmdbId), // No longer converting to number
         where("media_type", "==", "tv")
     );
     const seriesSnapshot = await getDocs(seriesQuery);
 
     if (seriesSnapshot.empty) {
+      console.log(`[API/SERIES] No stream document found for tmdbId: ${tmdbId}`);
       return NextResponse.json({ streams: [] });
     }
     const seriesDocId = seriesSnapshot.docs[0].id;
 
-    // Agora, buscamos o episódio dentro da subcoleção da série
     const episodeQuery = query(
       collection(firestore, `streams/${seriesDocId}/episodes`),
       where("season", "==", parseInt(season)),

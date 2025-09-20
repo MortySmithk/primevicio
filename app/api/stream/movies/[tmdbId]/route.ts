@@ -10,20 +10,17 @@ export async function GET(request: Request, { params }: { params: { tmdbId: stri
   }
 
   try {
-    // FIX: Convert tmdbId from string to number for correct Firestore query
-    const tmdbIdAsNumber = parseInt(tmdbId, 10);
-    if (isNaN(tmdbIdAsNumber)) {
-        return NextResponse.json({ error: "TMDB ID inválido." }, { status: 400 });
-    }
-
+    // FIX: Treat tmdbId as a string, which is likely how it's stored in Firestore.
     const streamsQuery = query(
         collection(firestore, "streams"), 
-        where("tmdbId", "==", tmdbIdAsNumber), 
+        where("tmdbId", "==", tmdbId), // No longer converting to number
         where("media_type", "==", "movie")
     );
     const streamsSnapshot = await getDocs(streamsQuery);
     
     if (streamsSnapshot.empty) {
+        // This log helps debug if a specific movie isn't found
+        console.log(`[API/MOVIES] No stream document found for tmdbId: ${tmdbId}`);
         return NextResponse.json({ streams: [] });
     }
 
