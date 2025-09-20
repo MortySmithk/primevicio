@@ -17,12 +17,8 @@ export async function GET() {
     // --- Processa Filmes ---
     const movieDocs = allStreamsSnapshot.docs.filter(doc => {
         const data = doc.data();
-        // ATENÇÃO: O filtro 'short.icu' foi removido para fins de depuração.
-        // Se os contadores funcionarem agora, significa que os dados no Firestore
-        // não correspondem ao filtro 'data.url?.includes("short.icu")'.
-        // Para reativar o filtro, remova o comentário da linha abaixo e apague a seguinte.
-        // return data.media_type === 'movie' && data.url?.includes("short.icu");
-        return data.media_type === 'movie';
+        // Filtra para contar apenas filmes com URL do short.icu
+        return data.media_type === 'movie' && data.url?.includes("short.icu");
     });
     moviesCount = movieDocs.length;
 
@@ -42,12 +38,9 @@ export async function GET() {
 
     // Processa os resultados após todas as buscas terminarem
     for (const { seriesDocId, episodeSnapshot } of allEpisodeResults) {
-        // ATENÇÃO: O filtro 'short.icu' foi removido para fins de depuração.
-        // Se os contadores funcionarem agora, significa que os dados no Firestore
-        // não correspondem ao filtro 'doc.data().url?.includes("short.icu")'.
-        // Para reativar o filtro, remova o comentário da linha abaixo e apague a seguinte.
-        // const abyssEpisodes = episodeSnapshot.docs.filter(doc => doc.data().url?.includes("short.icu"));
-        const abyssEpisodes = episodeSnapshot.docs;
+        // Filtra para contar apenas episódios com URL do short.icu
+        const abyssEpisodes = episodeSnapshot.docs.filter(doc => doc.data().url?.includes("short.icu"));
+        
         if (abyssEpisodes.length > 0) {
             seriesWithEpisodes.add(seriesDocId);
             episodesCount += abyssEpisodes.length;
