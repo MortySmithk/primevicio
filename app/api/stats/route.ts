@@ -7,15 +7,16 @@ export const revalidate = 0;
 
 export async function GET() {
   try {
-    const streamsCollection = collection(firestore, "streams");
-    const allStreamsSnapshot = await getDocs(streamsCollection);
+    // CORREÇÃO: Alterado de "streams" para "media"
+    const mediaCollection = collection(firestore, "media");
+    const allMediaSnapshot = await getDocs(mediaCollection);
 
     let moviesCount = 0;
     const seriesWithEpisodes = new Set<string>();
     let episodesCount = 0;
 
     // --- Processa Filmes ---
-    const movieDocs = allStreamsSnapshot.docs.filter(doc => {
+    const movieDocs = allMediaSnapshot.docs.filter(doc => {
         const data = doc.data();
         // Filtra para contar apenas filmes com URL do short.icu
         return data.media_type === 'movie' && data.url?.includes("short.icu");
@@ -23,11 +24,12 @@ export async function GET() {
     moviesCount = movieDocs.length;
 
     // --- Processa Séries ---
-    const seriesDocs = allStreamsSnapshot.docs.filter(doc => doc.data().media_type === 'tv');
+    const seriesDocs = allMediaSnapshot.docs.filter(doc => doc.data().media_type === 'tv');
 
     // Busca todas as subcoleções de episódios em paralelo
     const episodePromises = seriesDocs.map(seriesDoc => 
-        getDocs(collection(firestore, `streams/${seriesDoc.id}/episodes`))
+        // CORREÇÃO: Alterado de `streams/${seriesDoc.id}/episodes` para `media/${seriesDoc.id}/episodes`
+        getDocs(collection(firestore, `media/${seriesDoc.id}/episodes`))
             .then(episodeSnapshot => ({
                 seriesDocId: seriesDoc.id,
                 episodeSnapshot
@@ -63,3 +65,4 @@ export async function GET() {
     }, { status: 500 });
   }
 }
+

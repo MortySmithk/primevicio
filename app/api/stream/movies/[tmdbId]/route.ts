@@ -10,8 +10,9 @@ export async function GET(request: Request, { params }: { params: { tmdbId: stri
   }
 
   try {
+    // CORREÇÃO: Alterado de "streams" para "media"
     const streamsQuery = query(
-        collection(firestore, "streams"), 
+        collection(firestore, "media"), 
         where("tmdbId", "==", tmdbId),
         where("media_type", "==", "movie")
     );
@@ -22,7 +23,7 @@ export async function GET(request: Request, { params }: { params: { tmdbId: stri
       const tmdbIdAsNumber = parseInt(tmdbId, 10);
       if (!isNaN(tmdbIdAsNumber)) {
         const numericQuery = query(
-          collection(firestore, "streams"), 
+          collection(firestore, "media"), // CORREÇÃO
           where("tmdbId", "==", tmdbIdAsNumber),
           where("media_type", "==", "movie")
         );
@@ -31,7 +32,6 @@ export async function GET(request: Request, { params }: { params: { tmdbId: stri
     }
     
     if (streamsSnapshot.empty) {
-        // Este log ajuda a depurar se um filme específico não for encontrado
         console.log(`[API/MOVIES] Nenhum documento de stream encontrado para o tmdbId: ${tmdbId}`);
         return NextResponse.json({ streams: [] });
     }

@@ -10,8 +10,9 @@ export async function GET(request: Request, { params }: { params: { params: stri
   }
 
   try {
+    // CORREÇÃO: Alterado de "streams" para "media"
     const seriesQuery = query(
-        collection(firestore, "streams"), 
+        collection(firestore, "media"), 
         where("tmdbId", "==", tmdbId),
         where("media_type", "==", "tv")
     );
@@ -22,7 +23,7 @@ export async function GET(request: Request, { params }: { params: { params: stri
       const tmdbIdAsNumber = parseInt(tmdbId, 10);
       if (!isNaN(tmdbIdAsNumber)) {
         const numericQuery = query(
-            collection(firestore, "streams"), 
+            collection(firestore, "media"), // CORREÇÃO
             where("tmdbId", "==", tmdbIdAsNumber),
             where("media_type", "==", "tv")
         );
@@ -36,8 +37,9 @@ export async function GET(request: Request, { params }: { params: { params: stri
     }
     const seriesDocId = seriesSnapshot.docs[0].id;
 
+    // CORREÇÃO: Alterado de `streams/${seriesDocId}/episodes` para `media/${seriesDocId}/episodes`
     const episodeQuery = query(
-      collection(firestore, `streams/${seriesDocId}/episodes`),
+      collection(firestore, `media/${seriesDocId}/episodes`),
       where("season", "==", parseInt(season)),
       where("episode", "==", parseInt(episode))
     );
