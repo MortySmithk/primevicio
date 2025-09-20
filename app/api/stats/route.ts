@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { firestore } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 
-// Remove caching to ensure fresh data on every request during debugging
+// Remove o cache para garantir dados atualizados a cada requisição
 export const revalidate = 0;
 
 export async function GET() {
@@ -14,17 +14,22 @@ export async function GET() {
     const seriesWithEpisodes = new Set<string>();
     let episodesCount = 0;
 
-    // --- Process Movies ---
+    // --- Processa Filmes ---
     const movieDocs = allStreamsSnapshot.docs.filter(doc => {
         const data = doc.data();
-        return data.media_type === 'movie' && data.url?.includes("short.icu");
+        // ATENÇÃO: O filtro 'short.icu' foi removido para fins de depuração.
+        // Se os contadores funcionarem agora, significa que os dados no Firestore
+        // não correspondem ao filtro 'data.url?.includes("short.icu")'.
+        // Para reativar o filtro, remova o comentário da linha abaixo e apague a seguinte.
+        // return data.media_type === 'movie' && data.url?.includes("short.icu");
+        return data.media_type === 'movie';
     });
     moviesCount = movieDocs.length;
 
-    // --- Process Series ---
+    // --- Processa Séries ---
     const seriesDocs = allStreamsSnapshot.docs.filter(doc => doc.data().media_type === 'tv');
 
-    // Fetch all episode subcollections in parallel
+    // Busca todas as subcoleções de episódios em paralelo
     const episodePromises = seriesDocs.map(seriesDoc => 
         getDocs(collection(firestore, `streams/${seriesDoc.id}/episodes`))
             .then(episodeSnapshot => ({
@@ -35,9 +40,14 @@ export async function GET() {
 
     const allEpisodeResults = await Promise.all(episodePromises);
 
-    // Process results after all fetches are complete
+    // Processa os resultados após todas as buscas terminarem
     for (const { seriesDocId, episodeSnapshot } of allEpisodeResults) {
-        const abyssEpisodes = episodeSnapshot.docs.filter(doc => doc.data().url?.includes("short.icu"));
+        // ATENÇÃO: O filtro 'short.icu' foi removido para fins de depuração.
+        // Se os contadores funcionarem agora, significa que os dados no Firestore
+        // não correspondem ao filtro 'doc.data().url?.includes("short.icu")'.
+        // Para reativar o filtro, remova o comentário da linha abaixo e apague a seguinte.
+        // const abyssEpisodes = episodeSnapshot.docs.filter(doc => doc.data().url?.includes("short.icu"));
+        const abyssEpisodes = episodeSnapshot.docs;
         if (abyssEpisodes.length > 0) {
             seriesWithEpisodes.add(seriesDocId);
             episodesCount += abyssEpisodes.length;

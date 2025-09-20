@@ -10,16 +10,28 @@ export async function GET(request: Request, { params }: { params: { params: stri
   }
 
   try {
-    // FIX: Treat tmdbId as a string for the query.
     const seriesQuery = query(
         collection(firestore, "streams"), 
-        where("tmdbId", "==", tmdbId), // No longer converting to number
+        where("tmdbId", "==", tmdbId),
         where("media_type", "==", "tv")
     );
-    const seriesSnapshot = await getDocs(seriesQuery);
+    let seriesSnapshot = await getDocs(seriesQuery);
+
+    // Fallback: Se não encontrar resultados com string, tenta buscar como número
+    if (seriesSnapshot.empty) {
+      const tmdbIdAsNumber = parseInt(tmdbId, 10);
+      if (!isNaN(tmdbIdAsNumber)) {
+        const numericQuery = query(
+            collection(firestore, "streams"), 
+            where("tmdbId", "==", tmdbIdAsNumber),
+            where("media_type", "==", "tv")
+        );
+        seriesSnapshot = await getDocs(numericQuery);
+      }
+    }
 
     if (seriesSnapshot.empty) {
-      console.log(`[API/SERIES] No stream document found for tmdbId: ${tmdbId}`);
+      console.log(`[API/SERIES] Nenhum documento de stream encontrado para o tmdbId: ${tmdbId}`);
       return NextResponse.json({ streams: [] });
     }
     const seriesDocId = seriesSnapshot.docs[0].id;

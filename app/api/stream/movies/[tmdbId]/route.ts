@@ -10,17 +10,29 @@ export async function GET(request: Request, { params }: { params: { tmdbId: stri
   }
 
   try {
-    // FIX: Treat tmdbId as a string, which is likely how it's stored in Firestore.
     const streamsQuery = query(
         collection(firestore, "streams"), 
-        where("tmdbId", "==", tmdbId), // No longer converting to number
+        where("tmdbId", "==", tmdbId),
         where("media_type", "==", "movie")
     );
-    const streamsSnapshot = await getDocs(streamsQuery);
+    let streamsSnapshot = await getDocs(streamsQuery);
+
+    // Fallback: Se não encontrar resultados com string, tenta buscar como número
+    if (streamsSnapshot.empty) {
+      const tmdbIdAsNumber = parseInt(tmdbId, 10);
+      if (!isNaN(tmdbIdAsNumber)) {
+        const numericQuery = query(
+          collection(firestore, "streams"), 
+          where("tmdbId", "==", tmdbIdAsNumber),
+          where("media_type", "==", "movie")
+        );
+        streamsSnapshot = await getDocs(numericQuery);
+      }
+    }
     
     if (streamsSnapshot.empty) {
-        // This log helps debug if a specific movie isn't found
-        console.log(`[API/MOVIES] No stream document found for tmdbId: ${tmdbId}`);
+        // Este log ajuda a depurar se um filme específico não for encontrado
+        console.log(`[API/MOVIES] Nenhum documento de stream encontrado para o tmdbId: ${tmdbId}`);
         return NextResponse.json({ streams: [] });
     }
 
@@ -30,7 +42,7 @@ export async function GET(request: Request, { params }: { params: { tmdbId: stri
 
     return NextResponse.json({ streams });
   } catch (error) {
-    console.error(`Error fetching streams for movie ${tmdbId}:`, error);
+    console.error(`Erro ao buscar streams para o filme ${tmdbId}:`, error);
     return NextResponse.json({ error: "Failed to fetch streams" }, { status: 500 });
   }
 }
