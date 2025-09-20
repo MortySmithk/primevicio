@@ -1,3 +1,4 @@
+// app/embed/movie/[tmdbId]/page.tsx
 "use client"
 
 import { useParams } from 'next/navigation';
@@ -23,11 +24,11 @@ export default function MovieEmbedPage() {
             if (res.ok) {
                 const data = await res.json();
                 if (data.streams && data.streams.length > 0 && data.streams[0].url) {
-                    // A MÁGICA ACONTECE AQUI: REDIRECIONA PARA O PLAYER DA ABYSS
+                    // REDIRECIONA PARA O PLAYER
                     window.location.href = data.streams[0].url;
-                    return; // Interrompe a execução para não mostrar erro
+                    return; 
                 }
-                setError("Nenhum link de streaming da Abyss disponível para este filme.");
+                setError("Nenhum link de streaming disponível para este filme.");
             } else {
               setError("Falha ao buscar os links de streaming do nosso servidor.");
             }
@@ -35,7 +36,6 @@ export default function MovieEmbedPage() {
             console.error("Erro ao buscar a URL do stream", error);
             setError("Ocorreu um erro ao tentar carregar o filme.");
         } finally {
-            // Se o redirecionamento não acontecer, paramos o loading para mostrar o erro.
             setLoading(false);
         }
     };
@@ -43,7 +43,6 @@ export default function MovieEmbedPage() {
     fetchStreamAndRedirect();
   }, [tmdbId]);
 
-  // Esta tela só será exibida se o redirecionamento falhar.
   return (
       <main className="w-screen h-screen flex flex-col items-center justify-center bg-black text-white p-4">
         {loading && <Loader2 className="w-12 h-12 animate-spin text-white" />}

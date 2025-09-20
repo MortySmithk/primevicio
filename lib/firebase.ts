@@ -14,7 +14,6 @@ const firebaseConfig = {
 };
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-// Conectando ao Firestore, que é onde seu painel salva os links
 const firestore = getFirestore(app);
 
 export { firestore };

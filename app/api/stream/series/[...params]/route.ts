@@ -1,6 +1,7 @@
+// app/api/stream/series/[...params]/route.ts
 import { NextResponse } from "next/server";
+import { doc, getDoc } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
 
 export async function GET(request: Request, { params }: { params: { params: string[] } }) {
   const [tmdbId, season, episode] = params.params;
@@ -10,52 +11,33 @@ export async function GET(request: Request, { params }: { params: { params: stri
   }
 
   try {
-    // CORREÇÃO: Alterado de "streams" para "media"
-    const seriesQuery = query(
-        collection(firestore, "media"), 
-        where("tmdbId", "==", tmdbId),
-        where("media_type", "==", "tv")
-    );
-    let seriesSnapshot = await getDocs(seriesQuery);
+    const docRef = doc(firestore, "media", tmdbId);
+    const docSnap = await getDoc(docRef);
 
-    // Fallback: Se não encontrar resultados com string, tenta buscar como número
-    if (seriesSnapshot.empty) {
-      const tmdbIdAsNumber = parseInt(tmdbId, 10);
-      if (!isNaN(tmdbIdAsNumber)) {
-        const numericQuery = query(
-            collection(firestore, "media"), // CORREÇÃO
-            where("tmdbId", "==", tmdbIdAsNumber),
-            where("media_type", "==", "tv")
-        );
-        seriesSnapshot = await getDocs(numericQuery);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      const seasonData = data.seasons?.[season];
+      const episodeData = seasonData?.episodes?.find(
+        (ep: any) => ep.episode_number == parseInt(episode)
+      );
+
+      if (episodeData && episodeData.urls && episodeData.urls.length > 0) {
+        const abyssStream = episodeData.urls.find((u: any) => u.url?.includes("short.icu"));
+        if (abyssStream) {
+          const stream = {
+            playerType: 'abyss',
+            url: abyssStream.url,
+            name: abyssStream.quality || `T${season} E${episode}`
+          };
+          return NextResponse.json({ streams: [stream] });
+        }
       }
     }
+    
+    return NextResponse.json({ streams: [] });
 
-    if (seriesSnapshot.empty) {
-      console.log(`[API/SERIES] Nenhum documento de stream encontrado para o tmdbId: ${tmdbId}`);
-      return NextResponse.json({ streams: [] });
-    }
-    const seriesDocId = seriesSnapshot.docs[0].id;
-
-    // CORREÇÃO: Alterado de `streams/${seriesDocId}/episodes` para `media/${seriesDocId}/episodes`
-    const episodeQuery = query(
-      collection(firestore, `media/${seriesDocId}/episodes`),
-      where("season", "==", parseInt(season)),
-      where("episode", "==", parseInt(episode))
-    );
-    const episodeSnapshot = await getDocs(episodeQuery);
-
-    if (episodeSnapshot.empty) {
-        return NextResponse.json({ streams: [] });
-    }
-
-    const streams = episodeSnapshot.docs
-      .map(doc => doc.data())
-      .filter(stream => stream.url && stream.url.includes("short.icu"));
-
-    return NextResponse.json({ streams });
   } catch (error) {
-    console.error(`Error fetching streams for series ${tmdbId} S${season}E${episode}:`, error);
-    return NextResponse.json({ error: "Failed to fetch streams" }, { status: 500 });
+    console.error(`Erro ao buscar streams para a série ${tmdbId} S${season}E${episode}:`, error);
+    return NextResponse.json({ error: "Falha ao buscar streams" }, { status: 500 });
   }
 }

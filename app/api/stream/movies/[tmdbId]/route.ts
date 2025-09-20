@@ -1,6 +1,7 @@
+// app/api/stream/movies/[tmdbId]/route.ts
 import { NextResponse } from "next/server";
+import { doc, getDoc } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
 
 export async function GET(request: Request, { params }: { params: { tmdbId: string } }) {
   const { tmdbId } = params;
@@ -10,39 +11,27 @@ export async function GET(request: Request, { params }: { params: { tmdbId: stri
   }
 
   try {
-    // CORREÇÃO: Alterado de "streams" para "media"
-    const streamsQuery = query(
-        collection(firestore, "media"), 
-        where("tmdbId", "==", tmdbId),
-        where("media_type", "==", "movie")
-    );
-    let streamsSnapshot = await getDocs(streamsQuery);
+    const docRef = doc(firestore, "media", tmdbId);
+    const docSnap = await getDoc(docRef);
 
-    // Fallback: Se não encontrar resultados com string, tenta buscar como número
-    if (streamsSnapshot.empty) {
-      const tmdbIdAsNumber = parseInt(tmdbId, 10);
-      if (!isNaN(tmdbIdAsNumber)) {
-        const numericQuery = query(
-          collection(firestore, "media"), // CORREÇÃO
-          where("tmdbId", "==", tmdbIdAsNumber),
-          where("media_type", "==", "movie")
-        );
-        streamsSnapshot = await getDocs(numericQuery);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      // Assume que a URL está no campo 'url' e é do tipo 'movie'
+      if (data.type === 'movie' && data.urls && data.urls.length > 0 && data.urls[0].url.includes("short.icu")) {
+        const stream = {
+            playerType: 'abyss', // Mantendo a lógica anterior se necessário
+            url: data.urls[0].url,
+            name: data.urls[0].quality || "Fonte Principal"
+        };
+        return NextResponse.json({ streams: [stream] });
       }
     }
     
-    if (streamsSnapshot.empty) {
-        console.log(`[API/MOVIES] Nenhum documento de stream encontrado para o tmdbId: ${tmdbId}`);
-        return NextResponse.json({ streams: [] });
-    }
+    console.log(`[API/MOVIES] Nenhum stream encontrado para o tmdbId: ${tmdbId}`);
+    return NextResponse.json({ streams: [] });
 
-    const streams = streamsSnapshot.docs
-      .map(doc => doc.data())
-      .filter(stream => stream.url && stream.url.includes("short.icu"));
-
-    return NextResponse.json({ streams });
   } catch (error) {
     console.error(`Erro ao buscar streams para o filme ${tmdbId}:`, error);
-    return NextResponse.json({ error: "Failed to fetch streams" }, { status: 500 });
+    return NextResponse.json({ error: "Falha ao buscar streams" }, { status: 500 });
   }
 }
