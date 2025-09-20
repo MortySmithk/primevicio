@@ -1,65 +1,43 @@
-// app/embed/tv/[...slug]/page.tsx
-"use client"
+// app/api/stream/series/[...params]/route.ts
+import { NextResponse } from "next/server";
+import { doc, getDoc } from "firebase/firestore";
+import { firestore } from "@/lib/firebase";
 
-import { useParams } from 'next/navigation';
-import { Loader2, Tv } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+export async function GET(request: Request, { params }: { params: { params: string[] } }) {
+  const [tmdbId, season, episode] = params.params;
 
-export default function TvEmbedPage() {
-  const params = useParams();
-  const slug = params.slug as string[];
+  if (!tmdbId || !season || !episode) {
+    return NextResponse.json({ error: "TMDB ID, temporada e episódio são necessários." }, { status: 400 });
+  }
 
-  const tmdbId = slug?.[0];
-  const seasonNumber = slug?.[1];
-  const episodeNumber = slug?.[2];
+  try {
+    const docRef = doc(firestore, "media", tmdbId);
+    const docSnap = await getDoc(docRef);
 
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      const seasonData = data.seasons?.[season];
+      const episodeData = seasonData?.episodes?.find(
+        (ep: any) => ep.episode_number == parseInt(episode)
+      );
 
-  useEffect(() => {
-    if (!tmdbId || !seasonNumber || !episodeNumber) {
-        setError("Parâmetros inválidos para carregar o episódio.");
-        setLoading(false);
-        return;
+      if (episodeData && episodeData.urls && episodeData.urls.length > 0) {
+        const abyssStream = episodeData.urls.find((u: any) => u.url?.includes("short.icu"));
+        if (abyssStream) {
+          const stream = {
+            playerType: 'abyss',
+            url: abyssStream.url,
+            name: abyssStream.quality || `T${season} E${episode}`
+          };
+          return NextResponse.json({ streams: [stream] });
+        }
+      }
     }
     
-    const fetchAndLoadPlayer = async () => {
-        try {
-            const res = await fetch(`/api/stream/series/${tmdbId}/${seasonNumber}/${episodeNumber}`);
-            if (res.ok) {
-                const data = await res.json();
-                const abyssStream = data.streams?.find((s: any) => s.playerType === 'abyss' && s.url);
+    return NextResponse.json({ streams: [] });
 
-                if (abyssStream) {
-                    // MODIFICADO: Redireciona para a página de player interna
-                    const playerPageUrl = `/player?url=${encodeURIComponent(abyssStream.url)}`;
-                    window.location.href = playerPageUrl;
-                    return;
-                }
-                setError("Nenhum link de streaming disponível para este episódio.");
-            } else {
-                setError("Falha ao buscar os links de streaming do nosso servidor.");
-            }
-        } catch (error) {
-            console.error("Erro ao buscar a URL do stream", error);
-            setError("Ocorreu um erro ao tentar carregar o episódio.");
-        } finally {
-            setLoading(false);
-        }
-    };
-    fetchAndLoadPlayer();
-  }, [tmdbId, seasonNumber, episodeNumber]);
-
-  return (
-    <main className="w-screen h-screen flex flex-col items-center justify-center bg-black text-white p-4">
-    {loading && <Loader2 className="w-12 h-12 animate-spin text-white" />}
-    {error && (
-        <>
-            <Tv className="w-16 h-16 text-zinc-700 mb-4" />
-            <h2 className="text-xl font-bold mb-2">Erro ao Carregar</h2>
-            <p className="text-zinc-400 text-center">{error}</p>
-        </>
-    )}
-  </main>
-  );
+  } catch (error) {
+    console.error(`Erro ao buscar streams para a série ${tmdbId} S${season}E${episode}:`, error);
+    return NextResponse.json({ error: "Falha ao buscar streams" }, { status: 500 });
+  }
 }
