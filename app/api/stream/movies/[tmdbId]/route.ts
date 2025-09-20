@@ -16,18 +16,21 @@ export async function GET(request: Request, { params }: { params: { tmdbId: stri
 
     if (docSnap.exists()) {
       const data = docSnap.data();
-      // Assume que a URL está no campo 'url' e é do tipo 'movie'
-      if (data.type === 'movie' && data.urls && data.urls.length > 0 && data.urls[0].url.includes("short.icu")) {
-        const stream = {
-            playerType: 'abyss', // Mantendo a lógica anterior se necessário
-            url: data.urls[0].url,
-            name: data.urls[0].quality || "Fonte Principal"
-        };
-        return NextResponse.json({ streams: [stream] });
+      if (data.type === 'movie' && data.urls && data.urls.length > 0) {
+        // Procura pelo primeiro link válido do player
+        const validStream = data.urls.find((u: any) => u?.url?.includes("short.icu"));
+        
+        if (validStream) {
+          const stream = {
+              playerType: 'abyss',
+              url: validStream.url,
+              name: validStream.quality || "Fonte Principal"
+          };
+          return NextResponse.json({ streams: [stream] });
+        }
       }
     }
     
-    console.log(`[API/MOVIES] Nenhum stream encontrado para o tmdbId: ${tmdbId}`);
     return NextResponse.json({ streams: [] });
 
   } catch (error) {
